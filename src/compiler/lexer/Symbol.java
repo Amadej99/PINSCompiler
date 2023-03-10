@@ -59,6 +59,10 @@ public class Symbol {
         return position.toString() + " " + tokenType + ":" + lexeme;
     }
 
+    public TokenType getTokenType() {
+        return this.tokenType;
+    }
+
     // @todo:
     // override equals() and hashCode() ?
 }
