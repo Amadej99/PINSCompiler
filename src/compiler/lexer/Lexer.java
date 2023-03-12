@@ -9,7 +9,6 @@ import static common.RequireNonNull.requireNonNull;
 import static compiler.lexer.TokenType.*;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -167,10 +166,6 @@ public class Lexer {
 		}
 
 		symbols.add(new Symbol(Position.zero(), EOF, "$"));
-
-		for (int i = 0; i < symbols.size(); i++) {
-			System.out.println(symbols.get(i));
-		}
 
 		return symbols;
 	}
