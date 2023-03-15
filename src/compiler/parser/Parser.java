@@ -68,22 +68,22 @@ public class Parser {
 			si.skip();
 			parseFunDefinition();
 		} else if (!si.getNext().equals(EOF)) {
-			Report.error("Napaka v parseDefinition z " + si.getSymbol());
+			Report.error(si.getSymbol().position, "Expected EOF");
 		}
 	}
 
 	void parseDefinitions2() {
 		if (si.getNext().equals(OP_SEMICOLON)) {
-			dump("definitions2 → ; definitions");
+			dump("definitions2 -> ; definitions");
 			si.skip();
 			parseDefinitions();
 		} else {
-			dump("definitions2 → e");
+			dump("definitions2 -> e");
 		}
 	}
 
 	void parseTypeDefinition() {
-		dump("type_definition → typ identifier : type");
+		dump("type_definition -> typ identifier : type");
 		if (si.getNext().equals(IDENTIFIER)) {
 			si.skip();
 			if (si.getNext().equals(OP_COLON)) {
@@ -99,19 +99,19 @@ public class Parser {
 
 	void parseType() {
 		if (si.getNext().equals(IDENTIFIER)) {
-			dump("type → identifier");
+			dump("type -> identifier");
 			si.skip();
 		} else if (si.getNext().equals(AT_LOGICAL)) {
-			dump("type → logical");
+			dump("type -> logical");
 			si.skip();
 		} else if (si.getNext().equals(AT_INTEGER)) {
-			dump("type → integer");
+			dump("type -> integer");
 			si.skip();
 		} else if (si.getNext().equals(AT_STRING)) {
-			dump("type → string");
+			dump("type -> string");
 			si.skip();
 		} else if (si.getNext().equals(KW_ARR)) {
-			dump("type → arr [ int_const ] type");
+			dump("type -> arr [ int_const ] type");
 			si.skip();
 			parseArray();
 		} else {
@@ -139,7 +139,7 @@ public class Parser {
 	}
 
 	void parseVarDefinition() {
-		dump("variable_definition → var identifier : type");
+		dump("variable_definition -> var identifier : type");
 		if (si.getNext().equals(IDENTIFIER)) {
 			si.skip();
 			if (si.getNext().equals(OP_COLON)) {
@@ -154,7 +154,7 @@ public class Parser {
 	}
 
 	void parseFunDefinition() {
-		dump("function_definition → fun identifier ( parameters ) : type = expression");
+		dump("function_definition -> fun identifier ( parameters ) : type = expression");
 		if (si.getNext().equals(IDENTIFIER)) {
 			si.skip();
 			if (si.getNext().equals(OP_LPARENT)) {
@@ -402,151 +402,6 @@ public class Parser {
 			dump("postfix_expression2 -> e");
 		}
 	}
-
-	// void parseAtomExpression() {
-	// if (si.getNext().equals(IDENTIFIER)) {
-	// dump("atom_expression → identifier atom_expression2");
-	// si.skip();
-	// parseAtomExpression2();
-	// } else if (si.getNext().equals(C_LOGICAL)) {
-	// dump("atom_expression -> log_constant");
-	// si.skip();
-	// }
-	// if (si.getNext().equals(C_INTEGER)) {
-	// dump("atom_expression -> int_constant");
-	// si.skip();
-	// }
-	// if (si.getNext().equals(C_STRING)) {
-	// dump("atom_expression -> string_constant");
-	// si.skip();
-	// } else if (si.getNext().equals(OP_LBRACE)) {
-	// dump("atom_expression -> { atom_expression3");
-	// si.skip();
-	// parseAtomExpression3();
-	// } else if (si.getNext().equals(OP_LPARENT)) {
-	// dump("atom_expression -> ( expressions )");
-	// si.skip();
-	// parseExpressions();
-	// if (si.getNext().equals(OP_RPARENT)) {
-	// si.skip();
-	// } else {
-	// Report.error("Pricakoval ) dobil " + si.getSymbol());
-	// }
-	// }
-	// }
-
-	// void parseAtomExpression2() {
-	// if (si.getNext().equals(OP_LPARENT)) {
-	// dump("atom_expression2 -> ( expressions )");
-	// si.skip();
-	// parseExpressions();
-	// if (si.getNext().equals(OP_RPARENT)) {
-	// si.skip();
-	// } else {
-	// Report.error("Pricakoval ) dobil " + si.getSymbol());
-	// }
-	// } else {
-	// dump("atom_expression2 -> e");
-	// }
-	// }
-
-	// void parseAtomExpression3() {
-	// if (si.getNext().equals(KW_IF)) {
-	// dump("atom_expression3 -> if expression then expression atom_expression4");
-	// si.skip();
-	// parseExpression();
-	// if (si.getNext().equals(KW_THEN)) {
-	// si.skip();
-	// parseExpression();
-	// parseAtomExpression4();
-	// } else {
-	// Report.error("Pricakoval then dobil " + si.getSymbol());
-	// }
-	// } else if (si.getNext().equals(KW_WHILE)) {
-	// dump("atom_expression3 -> while expression : expression }");
-	// si.skip();
-	// parseExpression();
-	// if (si.getNext().equals(OP_COLON)) {
-	// si.skip();
-	// parseExpression();
-	// if (si.getNext().equals(OP_RBRACE)) {
-	// si.skip();
-	// } else {
-	// Report.error("Pricakoval } dobil " + si.getSymbol());
-	// }
-	// } else {
-	// Report.error("Pricakoval : dobil " + si.getSymbol());
-	// }
-	// } else if (si.getNext().equals(KW_FOR)) {
-	// dump("atom_expression3 -> for identifier = expression , expression ,
-	// expression : expression }");
-	// si.skip();
-	// if (si.getNext().equals(IDENTIFIER)) {
-	// si.skip();
-	// if (si.getNext().equals(OP_ASSIGN)) {
-	// si.skip();
-	// parseExpression();
-	// if (si.getNext().equals(OP_COMMA)) {
-	// si.skip();
-	// parseExpression();
-	// if (si.getNext().equals(OP_COMMA)) {
-	// si.skip();
-	// parseExpression();
-	// if (si.getNext().equals(OP_COLON)) {
-	// si.skip();
-	// parseExpression();
-	// if (si.getNext().equals(OP_RBRACE)) {
-	// si.skip();
-	// } else {
-	// Report.error("Pricakoval } dobil " + si.getSymbol());
-	// }
-	// } else {
-	// Report.error("Pricakoval : dobil " + si.getSymbol());
-	// }
-	// } else {
-	// Report.error("Pricakoval , dobil " + si.getSymbol());
-	// }
-	// } else {
-	// Report.error("Pricakoval , dobil " + si.getSymbol());
-	// }
-	// } else {
-	// Report.error("AE FOR Pricakoval = dobil " + si.getSymbol());
-	// }
-	// }
-	// } else {
-	// dump("atom_expression3 -> expression = expression }");
-	// parseExpression();
-	// if (si.getNext().equals(OP_ASSIGN)) {
-	// si.skip();
-	// parseExpression();
-	// if (si.getNext().equals(OP_RBRACE)) {
-	// si.skip();
-	// } else {
-	// Report.error("Pricakoval } dobil " + si.getSymbol());
-	// }
-	// } else {
-	// Report.error("AE3 Pricakoval = dobil " + si.getSymbol());
-	// }
-	// }
-	// }
-
-	// void parseAtomExpression4() {
-	// if (si.getNext().equals(OP_RBRACE)) {
-	// dump("atom_expression4 -> }");
-	// si.skip();
-	// } else if (si.getNext().equals(KW_ELSE)) {
-	// dump("atom_expression4 -> else expression }");
-	// si.skip();
-	// parseExpression();
-	// if (si.getNext().equals(OP_RBRACE)) {
-	// si.skip();
-	// } else {
-	// Report.error("Pricakoval } dobil " + si.getSymbol());
-	// }
-	// } else {
-	// Report.error("Pricakoval } ali else dobil " + si.getSymbol());
-	// }
-	// }
 
 	void parseAtomExpression() {
 		if (si.getNext().equals(C_INTEGER)) {
