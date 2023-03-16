@@ -46,6 +46,11 @@ public class Parser {
 	private void parseSource() {
 		dump("source -> definitions");
 		parseDefinitions();
+		if (si.getNext().equals(EOF)) {
+			System.out.println("OK");
+		} else {
+			Report.error(si.getSymbol().position, "Pricakoval EOF");
+		}
 	}
 
 	void parseDefinitions() {
