@@ -177,7 +177,6 @@ public class Lexer {
 	}
 
 	private TokenType findMatch(String currentString) {
-		System.out.println("'" + currentString + "'");
 		if (keywordMapping.containsKey(currentString)) {
 			return keywordMapping.get(currentString);
 		} else if (operatorMapping.containsKey(currentString)) {
