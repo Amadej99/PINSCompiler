@@ -124,6 +124,11 @@ public class Lexer {
 				currentString = "";
 			}
 
+			if (currentString.equals("	")) {
+				currentString = "";
+				col += 1;
+			}
+
 			if (currentString.length() < 1) {
 				startCol = col;
 				startLine = line;
@@ -151,10 +156,6 @@ public class Lexer {
 				continue;
 			}
 			col++;
-		}
-
-		if (currentString.equals(" ")) {
-			currentString = "";
 		}
 
 		if (currentString.length() > 0) {
