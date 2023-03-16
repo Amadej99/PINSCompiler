@@ -124,6 +124,11 @@ public class Lexer {
 				currentString = "";
 			}
 
+			if (currentString.equals("	")) {
+				currentString = "";
+				col += 1;
+			}
+
 			if (currentString.length() < 1) {
 				startCol = col;
 				startLine = line;
@@ -153,10 +158,6 @@ public class Lexer {
 			col++;
 		}
 
-		if (currentString.equals(" ")) {
-			currentString = "";
-		}
-
 		if (currentString.length() > 0) {
 			if (findMatch(backTrack(currentString)) == COMMENT)
 				currentString = "";
@@ -176,6 +177,7 @@ public class Lexer {
 	}
 
 	private TokenType findMatch(String currentString) {
+		System.out.println("'" + currentString + "'");
 		if (keywordMapping.containsKey(currentString)) {
 			return keywordMapping.get(currentString);
 		} else if (operatorMapping.containsKey(currentString)) {
