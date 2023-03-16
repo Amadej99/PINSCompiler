@@ -1,9 +1,9 @@
 import os
 
 java_dir = r"src"
-class_dir = r"src/Main.java"
+class_dir = r"src\Main"
 pins_dir = r"SYN"
-jar_file = r"lib/ArgPar-0.1.jar"
+jar_file = r"lib\ArgPar-0.1.jar"
 
 classpath = f"{java_dir};{class_dir};{jar_file}"
 
