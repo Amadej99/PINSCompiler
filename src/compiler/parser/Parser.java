@@ -72,8 +72,8 @@ public class Parser {
 			dump("definition -> fun_definition");
 			si.skip();
 			parseFunDefinition();
-		} else if (!si.getNext().equals(EOF)) {
-			Report.error(si.getSymbol().position, "Expected EOF");
+		} else {
+			Report.error(si.getSymbol().position, "Pricakoval typ, var ali fun");
 		}
 	}
 
