@@ -9,12 +9,24 @@ import static compiler.lexer.TokenType.*;
 import static common.RequireNonNull.requireNonNull;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import common.Report;
 import compiler.lexer.Position;
 import compiler.lexer.Symbol;
+import compiler.lexer.Position.Location;
+import compiler.parser.ast.Ast;
+import compiler.parser.ast.def.Def;
+import compiler.parser.ast.def.Defs;
+import compiler.parser.ast.def.FunDef;
+import compiler.parser.ast.def.TypeDef;
+import compiler.parser.ast.def.VarDef;
+import compiler.parser.ast.type.Array;
+import compiler.parser.ast.type.Atom;
+import compiler.parser.ast.type.Type;
+import compiler.parser.ast.type.TypeName;
 
 public class Parser {
 	/**
@@ -39,127 +51,157 @@ public class Parser {
 	/**
 	 * Izvedi sintaksno analizo.
 	 */
-	public void parse() {
-		parseSource();
+	public Ast parse() {
+		return parseSource();
 	}
 
-	private void parseSource() {
+	private Defs parseSource() {
 		dump("source -> definitions");
-		parseDefinitions();
+		var defs = parseDefinitions();
 		if (si.getNext().equals(EOF)) {
+			return defs;
 		} else {
 			Report.error(si.getSymbol().position, "Pricakoval EOF");
+			return null;
 		}
 	}
 
-	void parseDefinitions() {
+	Defs parseDefinitions() {
 		dump("definitions -> definition definitions2");
-		parseDefinition();
-		parseDefinitions2();
+		Location start = si.getSymbol().position.start;
+		Def def = parseDefinition();
+		List<Def> defsList = new ArrayList<>();
+		Defs defs = parseDefinitions2();
+		return new Defs(new Position(start, def.position.end), defsList);
 	}
 
-	void parseDefinition() {
+	Def parseDefinition() {
 		if (si.getNext().equals(KW_TYP)) {
 			dump("definition -> type_definition");
-			si.skip();
-			parseTypeDefinition();
+			return parseTypeDefinition();
 		} else if (si.getNext().equals(KW_VAR)) {
 			dump("definition -> var_definition");
-			si.skip();
-			parseVarDefinition();
+			return parseVarDefinition();
 		} else if (si.getNext().equals(KW_FUN)) {
 			dump("definition -> fun_definition");
 			si.skip();
-			parseFunDefinition();
+			return null;
 		} else {
 			Report.error(si.getSymbol().position, "Pricakoval typ, var ali fun");
+			return null;
 		}
 	}
 
-	void parseDefinitions2() {
+	Defs parseDefinitions2() {
 		if (si.getNext().equals(OP_SEMICOLON)) {
 			dump("definitions2 -> ; definitions");
 			si.skip();
-			parseDefinitions();
+			return parseDefinitions();
 		} else {
 			dump("definitions2 -> e");
+			return null;
 		}
 	}
 
-	void parseTypeDefinition() {
+	TypeDef parseTypeDefinition() {
 		dump("type_definition -> typ identifier : type");
+		Location startPosition = si.getSymbol().position.start;
+		si.skip();
 		if (si.getNext().equals(IDENTIFIER)) {
+			String name = si.getSymbol().lexeme;
 			si.skip();
 			if (si.getNext().equals(OP_COLON)) {
 				si.skip();
-				parseType();
+				var type = parseType();
+				return new TypeDef(new Position(startPosition, type.position.end), name, type);
 			} else {
 				Report.error(si.getSymbol().position, "Pricakoval :");
+				return null;
 			}
 		} else {
 			Report.error(si.getSymbol().position, "Pricakoval identifier");
+			return null;
 		}
 	}
 
-	void parseType() {
+	Type parseType() {
+		Symbol s = si.getSymbol();
 		if (si.getNext().equals(IDENTIFIER)) {
 			dump("type -> identifier");
 			si.skip();
+			return new TypeName(s.position, s.lexeme);
 		} else if (si.getNext().equals(AT_LOGICAL)) {
 			dump("type -> logical");
 			si.skip();
+			return Atom.LOG(s.position);
 		} else if (si.getNext().equals(AT_INTEGER)) {
 			dump("type -> integer");
 			si.skip();
+			return Atom.INT(s.position);
 		} else if (si.getNext().equals(AT_STRING)) {
 			dump("type -> string");
 			si.skip();
+			return Atom.STR(s.position);
 		} else if (si.getNext().equals(KW_ARR)) {
 			dump("type -> arr [ int_const ] type");
-			si.skip();
-			parseArray();
+			return parseArray();
 		} else {
 			Report.error(si.getSymbol().position, "pricakoval identifier, logical, integer, string ali arr");
+			return null;
 		}
 	}
 
-	void parseArray() {
+	Array parseArray() {
+		Location start = si.getSymbol().position.start;
+		si.skip();
 		if (si.getNext().equals(OP_LBRACKET)) {
 			si.skip();
 			if (si.getNext().equals(C_INTEGER)) {
+				int size = Integer.parseInt(si.getSymbol().lexeme);
 				si.skip();
 				if (si.getNext().equals(OP_RBRACKET)) {
 					si.skip();
-					parseType();
+					var type = parseType();
+					return new Array(new Position(start, type.position.end), size, type);
 				} else {
 					Report.error(si.getSymbol().position, "pricakoval ]");
+					return null;
 				}
 			} else {
 				Report.error(si.getSymbol().position, "pricakoval int_const");
+				return null;
 			}
 		} else {
 			Report.error(si.getSymbol().position, "pricakoval [");
+			return null;
 		}
 	}
 
-	void parseVarDefinition() {
+	VarDef parseVarDefinition() {
 		dump("variable_definition -> var identifier : type");
+		Location startPosition = si.getSymbol().position.start;
+		si.skip();
 		if (si.getNext().equals(IDENTIFIER)) {
+			String name = si.getSymbol().lexeme;
 			si.skip();
 			if (si.getNext().equals(OP_COLON)) {
 				si.skip();
-				parseType();
+				var type = parseType();
+				return new VarDef(new Position(startPosition, type.position.end), name, type);
 			} else {
 				Report.error(si.getSymbol().position, "Pricakoval :");
+				return null;
 			}
 		} else {
 			Report.error(si.getSymbol().position, "Pricakoval identifier");
+			return null;
 		}
 	}
 
 	void parseFunDefinition() {
 		dump("function_definition -> fun identifier ( parameters ) : type = expression");
 		if (si.getNext().equals(IDENTIFIER)) {
+			String name = si.getSymbol().lexeme;
 			si.skip();
 			if (si.getNext().equals(OP_LPARENT)) {
 				si.skip();
