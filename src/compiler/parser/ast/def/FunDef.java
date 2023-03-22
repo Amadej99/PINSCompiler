@@ -41,7 +41,10 @@ public class FunDef extends Def {
         this.body = body;
     }
 
-	@Override public void accept(Visitor visitor) { visitor.visit(this); }
+    @Override
+    public void accept(Visitor visitor) {
+        visitor.visit(this);
+    }
 
     /**
      * Parameter funkcije.
@@ -51,13 +54,16 @@ public class FunDef extends Def {
          * Tip parametra.
          */
         public final Type type;
-    
+
         public Parameter(Position position, String name, Type type) {
             super(position, name);
             requireNonNull(type);
             this.type = type;
         }
-    
-        @Override public void accept(Visitor visitor) { visitor.visit(this); }
+
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visit(this);
+        }
     }
 }

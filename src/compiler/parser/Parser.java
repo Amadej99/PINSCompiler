@@ -23,6 +23,19 @@ import compiler.parser.ast.def.Defs;
 import compiler.parser.ast.def.FunDef;
 import compiler.parser.ast.def.TypeDef;
 import compiler.parser.ast.def.VarDef;
+import compiler.parser.ast.def.FunDef.Parameter;
+import compiler.parser.ast.expr.Binary;
+import compiler.parser.ast.expr.Block;
+import compiler.parser.ast.expr.Call;
+import compiler.parser.ast.expr.Expr;
+import compiler.parser.ast.expr.For;
+import compiler.parser.ast.expr.IfThenElse;
+import compiler.parser.ast.expr.Literal;
+import compiler.parser.ast.expr.Name;
+import compiler.parser.ast.expr.Unary;
+import compiler.parser.ast.expr.Where;
+import compiler.parser.ast.expr.While;
+import compiler.parser.ast.expr.Binary.Operator;
 import compiler.parser.ast.type.Array;
 import compiler.parser.ast.type.Atom;
 import compiler.parser.ast.type.Type;
@@ -57,25 +70,26 @@ public class Parser {
 
 	private Defs parseSource() {
 		dump("source -> definitions");
-		var defs = parseDefinitions();
+		var defs_start = new Defs(null, new ArrayList<Def>());
+		var defs = parseDefinitions(defs_start);
+		var defs2 = new Defs(new Position(defs.definitions.get(0).position.start,
+				defs.definitions.get(defs.definitions.size() - 1).position.end), defs.definitions);
 		if (si.getNext().equals(EOF)) {
-			return defs;
+			return defs2;
 		} else {
 			Report.error(si.getSymbol().position, "Pricakoval EOF");
 			return null;
 		}
 	}
 
-	Defs parseDefinitions() {
+	Defs parseDefinitions(Defs defs) {
 		dump("definitions -> definition definitions2");
-		Location start = si.getSymbol().position.start;
-		Def def = parseDefinition();
-		List<Def> defsList = new ArrayList<>();
-		Defs defs = parseDefinitions2();
-		return new Defs(new Position(start, def.position.end), defsList);
+		var def = parseDefinition(defs);
+		defs.definitions.add(def);
+		return parseDefinitions2(defs);
 	}
 
-	Def parseDefinition() {
+	Def parseDefinition(Defs defs) {
 		if (si.getNext().equals(KW_TYP)) {
 			dump("definition -> type_definition");
 			return parseTypeDefinition();
@@ -84,22 +98,21 @@ public class Parser {
 			return parseVarDefinition();
 		} else if (si.getNext().equals(KW_FUN)) {
 			dump("definition -> fun_definition");
-			si.skip();
-			return null;
+			return parseFunDefinition();
 		} else {
 			Report.error(si.getSymbol().position, "Pricakoval typ, var ali fun");
 			return null;
 		}
 	}
 
-	Defs parseDefinitions2() {
+	Defs parseDefinitions2(Defs defs) {
 		if (si.getNext().equals(OP_SEMICOLON)) {
 			dump("definitions2 -> ; definitions");
 			si.skip();
-			return parseDefinitions();
+			return parseDefinitions(defs);
 		} else {
 			dump("definitions2 -> e");
-			return null;
+			return defs;
 		}
 	}
 
@@ -198,419 +211,532 @@ public class Parser {
 		}
 	}
 
-	void parseFunDefinition() {
+	FunDef parseFunDefinition() {
 		dump("function_definition -> fun identifier ( parameters ) : type = expression");
+		Symbol start = si.getSymbol();
+		si.skip();
 		if (si.getNext().equals(IDENTIFIER)) {
 			String name = si.getSymbol().lexeme;
 			si.skip();
 			if (si.getNext().equals(OP_LPARENT)) {
 				si.skip();
-				parseParameters();
+				var empty_list = new ArrayList<Parameter>();
+				var params = parseParameters(empty_list);
 				if (si.getNext().equals(OP_RPARENT)) {
 					si.skip();
 					if (si.getNext().equals(OP_COLON)) {
 						si.skip();
-						parseType();
+						var type = parseType();
 						if (si.getNext().equals(OP_ASSIGN)) {
 							si.skip();
-							parseExpression();
+							var expr = parseExpression();
+							return new FunDef(new Position(start.position.start, expr.position.end), name, params,
+									type, expr);
 						} else {
 							Report.error(si.getSymbol().position, "Pricakoval =");
+							return null;
 						}
 					} else {
 						Report.error(si.getSymbol().position, "Pricakoval :");
+						return null;
 					}
 				} else {
 					Report.error(si.getSymbol().position, "Pricakoval (");
+					return null;
 				}
 			} else {
 				Report.error(si.getSymbol().position, "Pricakoval (");
+				return null;
 			}
 		} else {
 			Report.error(si.getSymbol().position, "Pricakoval identifier");
+			return null;
 		}
 	}
 
-	void parseParameters() {
+	List<Parameter> parseParameters(List<Parameter> params) {
 		dump("parameters -> parameter parameters2");
-		parseParameter();
-		parseParameters2();
+		var param = parseParameter(params);
+		params.add(param);
+		return parseParameters2(params);
 	}
 
-	void parseParameter() {
+	Parameter parseParameter(List<Parameter> params) {
 		dump("parameter -> identifier : type");
 		if (si.getNext().equals(IDENTIFIER)) {
+			Symbol s = si.getSymbol();
 			si.skip();
 			if (si.getNext().equals(OP_COLON)) {
 				si.skip();
-				parseType();
+				var type = parseType();
+				return new Parameter(new Position(s.position.start, type.position.end), s.lexeme, type);
 			} else {
 				Report.error(si.getSymbol().position, "Pricakoval :");
+				return null;
 			}
 		} else {
 			Report.error(si.getSymbol().position, "Pricakoval identifier");
+			return null;
 		}
 	}
 
-	void parseParameters2() {
+	List<Parameter> parseParameters2(List<Parameter> params) {
 		if (si.getNext().equals(OP_COMMA)) {
-			dump("parameters2 -> , parameter parameters2");
+			dump("parameters2 -> , parameters");
 			si.skip();
-			parseParameter();
-			parseParameters2();
+			return parseParameters(params);
 		} else {
 			dump("parameters2 -> e");
+			return params;
 		}
 	}
 
-	void parseExpression() {
+	Expr parseExpression() {
 		dump("expression -> logical_ior_expression expression2");
-		parseLogicalIorExpression();
-		parseExpression2();
+		var left = parseLogicalIorExpression();
+		return parseExpression2(left);
 	}
 
-	void parseExpression2() {
+	Expr parseExpression2(Expr left) {
 		if (si.getNext().equals(OP_LBRACE)) {
 			dump("expression2 -> { WHERE definitions }");
 			si.skip();
 			if (si.getNext().equals(KW_WHERE)) {
 				si.skip();
-				parseDefinitions();
+				var defs_start = new Defs(null, new ArrayList<Def>());
+				Defs defs = parseDefinitions(defs_start);
+				Defs defs2 = new Defs(new Position(defs.definitions.get(0).position.start,
+						defs.definitions.get(defs.definitions.size() - 1).position.end), defs.definitions);
 				if (si.getNext().equals(OP_RBRACE)) {
+					Symbol end = si.getSymbol();
 					si.skip();
+					return new Where(new Position(left.position.start, end.position.end), left, defs2);
 				} else {
 					Report.error(si.getSymbol().position, "Pricakoval }");
+					return null;
 				}
 			} else {
 				Report.error(si.getSymbol().position, "Pricakoval WHERE");
+				return null;
 			}
 		} else {
 			dump("expression2 -> e");
+			return left;
 		}
 	}
 
-	void parseLogicalIorExpression() {
+	Expr parseLogicalIorExpression() {
 		dump("logical_ior_expression -> logical_and_expression logical_ior_expression2");
-		parseLogicalAndExpression();
-		parseLogicalIorExpression2();
+		var left = parseLogicalAndExpression();
+		return parseLogicalIorExpression2(left);
 	}
 
-	void parseLogicalIorExpression2() {
+	Expr parseLogicalIorExpression2(Expr left) {
 		if (si.getNext().equals(OP_OR)) {
 			dump("logical_ior_expression2 -> | logical_and_expression logical_ior_expression2");
 			si.skip();
-			parseLogicalAndExpression();
-			parseLogicalIorExpression2();
+			var right = parseLogicalAndExpression();
+			var bin = new Binary(new Position(left.position.start, right.position.end), left, Operator.OR, right);
+			return parseLogicalIorExpression2(bin);
 		} else {
 			dump("logical_ior_expression2 -> e");
+			return left;
 		}
 	}
 
-	void parseLogicalAndExpression() {
+	Expr parseLogicalAndExpression() {
 		dump("logical_and_expression -> compare_expression logical_and_expression2");
-		parseCompareExpression();
-		parseLogicalAndExpression2();
+		var left = parseCompareExpression();
+		return parseLogicalAndExpression2(left);
 	}
 
-	void parseLogicalAndExpression2() {
+	Expr parseLogicalAndExpression2(Expr left) {
 		if (si.getNext().equals(OP_AND)) {
 			dump("logical_and_expression2 -> & compare_expression logical_and_expression2");
 			si.skip();
-			parseCompareExpression();
-			parseLogicalAndExpression2();
+			var right = parseCompareExpression();
+			var bin = new Binary(new Position(left.position.start, right.position.end), left, Operator.AND, right);
+			return parseLogicalAndExpression2(bin);
 		} else {
 			dump("logical_and_expression2 -> e");
+			return left;
 		}
 	}
 
-	void parseCompareExpression() {
+	Expr parseCompareExpression() {
 		dump("compare_expression -> additive_expression compare_expression2");
-		parseAdditiveExpression();
-		parseCompareExpression2();
+		var left = parseAdditiveExpression();
+		return parseCompareExpression2(left);
 	}
 
-	void parseCompareExpression2() {
+	Expr parseCompareExpression2(Expr left) {
 		if (si.getNext().equals(OP_EQ)) {
 			dump("compare_expression2 -> == additive_expression");
 			si.skip();
-			parseAdditiveExpression();
+			var right = parseAdditiveExpression();
+			return new Binary(new Position(left.position.start, right.position.end), left, Operator.EQ, right);
 		} else if (si.getNext().equals(OP_NEQ)) {
 			dump("compare_expression2 -> != additive_expression");
 			si.skip();
-			parseAdditiveExpression();
+			var right = parseAdditiveExpression();
+			return new Binary(new Position(left.position.start, right.position.end), left, Operator.NEQ, right);
 		} else if (si.getNext().equals(OP_LT)) {
 			dump("compare_expression2 -> < additive_expression");
 			si.skip();
-			parseAdditiveExpression();
+			var right = parseAdditiveExpression();
+			return new Binary(new Position(left.position.start, right.position.end), left, Operator.LT, right);
 		} else if (si.getNext().equals(OP_GT)) {
 			dump("compare_expression2 -> > additive_expression");
 			si.skip();
-			parseAdditiveExpression();
+			var right = parseAdditiveExpression();
+			return new Binary(new Position(left.position.start, right.position.end), left, Operator.GT, right);
 		} else if (si.getNext().equals(OP_LEQ)) {
 			dump("compare_expression2 -> <= additive_expression");
 			si.skip();
-			parseAdditiveExpression();
+			var right = parseAdditiveExpression();
+			return new Binary(new Position(left.position.start, right.position.end), left, Operator.LEQ, right);
 		} else if (si.getNext().equals(OP_GEQ)) {
 			dump("compare_expression2 -> >= additive_expression");
 			si.skip();
-			parseAdditiveExpression();
+			var right = parseAdditiveExpression();
+			return new Binary(new Position(left.position.start, right.position.end), left, Operator.GEQ, right);
 		} else {
 			dump("compare_expression2 -> e");
+			return left;
 		}
 	}
 
-	void parseAdditiveExpression() {
+	Expr parseAdditiveExpression() {
 		dump("additive_expression -> multiplicative_expression additive_expression2");
-		parseMultiplicativeExpression();
-		parseAdditiveExpression2();
+		var left = parseMultiplicativeExpression();
+		return parseAdditiveExpression2(left);
 	}
 
-	void parseAdditiveExpression2() {
+	Expr parseAdditiveExpression2(Expr left) {
 		if (si.getNext().equals(OP_ADD)) {
 			dump("additive_expression2 -> + multiplicative_expression additive_expression2");
 			si.skip();
-			parseMultiplicativeExpression();
-			parseAdditiveExpression2();
+			var right = parseMultiplicativeExpression();
+			var bin = new Binary(new Position(left.position.start, right.position.end), left, Operator.ADD, right);
+			return parseAdditiveExpression2(bin);
 		} else if (si.getNext().equals(OP_SUB)) {
 			dump("additive_expression2 -> - multiplicative_expression additive_expression2");
 			si.skip();
-			parseMultiplicativeExpression();
-			parseAdditiveExpression2();
+			var right = parseMultiplicativeExpression();
+			var bin = new Binary(new Position(left.position.start, right.position.end), left, Operator.SUB, right);
+			return parseAdditiveExpression2(bin);
 		} else {
 			dump("additive_expression2 -> e");
+			return left;
 		}
 	}
 
-	void parseMultiplicativeExpression() {
+	Expr parseMultiplicativeExpression() {
 		dump("multiplicative_expression -> prefix_expression multiplicative_expression2");
-		parsePrefixExpression();
-		parseMultiplicativeExpression2();
+		var left = parsePrefixExpression();
+		return parseMultiplicativeExpression2(left);
 	}
 
-	void parseMultiplicativeExpression2() {
+	Expr parseMultiplicativeExpression2(Expr left) {
 		if (si.getNext().equals(OP_MUL)) {
 			dump("multiplicative_expression2 -> * prefix_expression multiplicative_expression2");
 			si.skip();
-			parsePrefixExpression();
-			parseMultiplicativeExpression2();
+			var right = parsePrefixExpression();
+			var bin = new Binary(new Position(left.position.start, right.position.end), left, Operator.MUL, right);
+			return parseMultiplicativeExpression2(bin);
 		} else if (si.getNext().equals(OP_DIV)) {
 			dump("multiplicative_expression2 -> / prefix_expression multiplicative_expression2");
 			si.skip();
-			parsePrefixExpression();
-			parseMultiplicativeExpression2();
+			var right = parsePrefixExpression();
+			var bin = new Binary(new Position(left.position.start, right.position.end), left, Operator.DIV, right);
+			return parseMultiplicativeExpression2(bin);
 		} else if (si.getNext().equals(OP_MOD)) {
 			dump("multiplicative_expression2 -> % prefix_expression multiplicative_expression2");
 			si.skip();
-			parsePrefixExpression();
-			parseMultiplicativeExpression2();
+			var right = parsePrefixExpression();
+			var bin = new Binary(new Position(left.position.start, right.position.end), left, Operator.MOD, right);
+			return parseMultiplicativeExpression2(bin);
 		} else {
 			dump("multiplicative_expression2 -> e");
+			return left;
 		}
 	}
 
-	void parsePrefixExpression() {
+	Expr parsePrefixExpression() {
 		if (si.getNext().equals(OP_ADD)) {
 			dump("prefix_expression -> + prefix_expression");
 			si.skip();
-			parsePrefixExpression();
+			var izraz = parsePrefixExpression();
+			return new Unary(izraz.position, izraz, Unary.Operator.ADD);
 		} else if (si.getNext().equals(OP_SUB)) {
 			dump("prefix_expression -> - prefix_expression");
 			si.skip();
-			parsePrefixExpression();
+			var izraz = parsePrefixExpression();
+			return new Unary(izraz.position, izraz, Unary.Operator.SUB);
 		} else if (si.getNext().equals(OP_NOT)) {
 			dump("prefix_expression -> ! prefix_expression");
 			si.skip();
-			parsePrefixExpression();
+			var izraz = parsePrefixExpression();
+			return new Unary(izraz.position, izraz, Unary.Operator.NOT);
 		} else {
 			dump("prefix_expression -> postfix_expression");
-			parsePostfixExpression();
+			return parsePostfixExpression();
 		}
 	}
 
-	void parsePostfixExpression() {
+	Expr parsePostfixExpression() {
 		dump("postfix_expression -> atom_expression postfix_expression2");
-		parseAtomExpression();
-		parsePostfixExpression2();
+		var left = parseAtomExpression();
+		return parsePostfixExpression2(left);
 	}
 
-	void parsePostfixExpression2() {
+	Expr parsePostfixExpression2(Expr left) {
 		if (si.getNext().equals(OP_LBRACKET)) {
 			dump("postfix_expression2 -> [ expression ] postfix_expression2");
 			si.skip();
-			parseExpression();
+			var right = parseExpression();
 			if (si.getNext().equals(OP_RBRACKET)) {
+				Symbol end = si.getSymbol();
 				si.skip();
-				parsePostfixExpression2();
+				var bin = new Binary(new Position(left.position.start, end.position.end), left, Operator.ARR,
+						right);
+				return parsePostfixExpression2(bin);
 			} else {
 				Report.error(si.getSymbol().position, "Expected ]");
+				return null;
 			}
 		} else {
 			dump("postfix_expression2 -> e");
+			return left;
 		}
 	}
 
-	void parseAtomExpression() {
+	Expr parseAtomExpression() {
+		Symbol s = si.getSymbol();
 		if (si.getNext().equals(C_INTEGER)) {
 			dump("atom_expression -> int_constant");
 			si.skip();
+			return new Literal(s.position, s.lexeme, Atom.Type.INT);
 		} else if (si.getNext().equals(C_LOGICAL)) {
 			dump("atom_expression -> logical_constant");
 			si.skip();
+			return new Literal(s.position, s.lexeme, Atom.Type.LOG);
 		} else if (si.getNext().equals(C_STRING)) {
 			dump("atom_expression -> string_constant");
 			si.skip();
+			return new Literal(s.position, s.lexeme, Atom.Type.STR);
 		} else if (si.getNext().equals(IDENTIFIER)) {
 			dump("atom_expression -> identifier atom_expression2");
 			si.skip();
-			parseAtomExpression2();
+			var left = new Name(s.position, s.lexeme);
+			return parseAtomExpression2(left);
 		} else if (si.getNext().equals(OP_LPARENT)) {
 			dump("atom_expression -> ( expression )");
 			si.skip();
-			parseExpression();
+			var exprs = parseExpressions(new ArrayList<Expr>());
 			if (si.getNext().equals(OP_RPARENT)) {
+				Symbol end = si.getSymbol();
 				si.skip();
+				return new Block(new Position(s.position.start, end.position.end), exprs);
 			} else {
 				Report.error("Pricakoval ) dobil " + si.getSymbol());
+				return null;
 			}
 		} else if (si.getNext().equals(OP_LBRACE)) {
 			dump("atom_expression -> { atom_expression4");
-			si.skip();
-			parseAtomExpression4();
+			return parseAtomExpression4();
 		} else {
 			Report.error("Pricakoval int_constant, logical_constant, string_constant, identifier ali ( dobil "
 					+ si.getSymbol());
+			return null;
 
 		}
 	}
 
-	void parseAtomExpression2() {
+	Expr parseAtomExpression2(Name left) {
 		if (si.getNext().equals(OP_LPARENT)) {
 			dump("atom_expression2 -> ( expressions )");
 			si.skip();
-			parseExpressions();
+			var empty_list = new ArrayList<Expr>();
+			var args = parseExpressions(empty_list);
 			if (si.getNext().equals(OP_RPARENT)) {
+				Symbol end = si.getSymbol();
 				si.skip();
+				return new Call(new Position(left.position.start, end.position.end), args,
+						left.name);
 			} else {
-				Report.error(si.getSymbol().position, "Pricakoval ) dobil " + si.getSymbol());
+				Report.error(si.getSymbol().position, "Pricakoval ) dobil " +
+						si.getSymbol());
+				return null;
 			}
 		} else {
 			dump("atom_expression2 -> e");
+			return left;
 		}
 	}
 
-	void parseAtomExpression3() {
+	Expr parseAtomExpression3() {
 		if (si.getNext().equals(OP_RBRACE)) {
 			dump("atom_expression3 -> }");
-			si.skip();
+			return null;
 		} else if (si.getNext().equals(KW_ELSE)) {
 			dump("atom_expression3 -> else expression }");
 			si.skip();
-			parseExpression();
+			var expr = parseExpression();
 			if (si.getNext().equals(OP_RBRACE)) {
-				si.skip();
+				return expr;
 			} else {
 				Report.error("Pricakoval } dobil " + si.getSymbol());
+				return null;
 			}
 		} else {
 			Report.error(si.getSymbol().position, "Pricakoval } ali else dobil " + si.getSymbol());
+			return null;
 		}
 	}
 
-	void parseAtomExpression4() {
+	Expr parseAtomExpression4() {
+		Symbol s = si.getSymbol();
+		si.skip();
 		if (si.getNext().equals(KW_IF)) {
 			dump("atom_expression4 -> if expression then expression atom_expression3");
 			si.skip();
-			parseExpression();
+			var expr = parseExpression();
 			if (si.getNext().equals(KW_THEN)) {
 				si.skip();
-				parseExpression();
-				parseAtomExpression3();
+				var then = parseExpression();
+				var else_expr = parseAtomExpression3();
+				Symbol end = si.getSymbol();
+				si.skip();
+				if (else_expr == null)
+					return new IfThenElse(
+							new Position(s.position.start, end.position.end),
+							expr, then);
+				else
+					return new IfThenElse(new Position(s.position.start, end.position.end), expr, then,
+							else_expr);
 			} else {
-				Report.error(si.getSymbol().position, "Pricakoval then dobil " + si.getSymbol());
+				Report.error(si.getSymbol().position, "Pricakoval then dobil " +
+						si.getSymbol());
+				return null;
 			}
 		} else if (si.getNext().equals(KW_WHILE)) {
 			dump("atom_expression4 -> while expression : expression }");
 			si.skip();
-			parseExpression();
+			var expr = parseExpression();
 			if (si.getNext().equals(OP_COLON)) {
 				si.skip();
-				parseExpression();
+				var expr2 = parseExpression();
 				if (si.getNext().equals(OP_RBRACE)) {
+					Symbol end = si.getSymbol();
 					si.skip();
+					return new While(
+							new Position(s.position.start, end.position.end),
+							expr, expr2);
 				} else {
-					Report.error(si.getSymbol().position, "Pricakoval } dobil " + si.getSymbol());
+					Report.error(si.getSymbol().position, "Pricakoval } dobil " +
+							si.getSymbol());
+					return null;
 				}
 			} else {
-				Report.error(si.getSymbol().position, "Pricakoval : dobil " + si.getSymbol());
+				Report.error(si.getSymbol().position, "Pricakoval : dobil " +
+						si.getSymbol());
+				return null;
 			}
 		} else if (si.getNext().equals(KW_FOR)) {
 			dump("atom_expression4 -> for identifier = expression , expression , expression : expression } .");
 			si.skip();
 			if (si.getNext().equals(IDENTIFIER)) {
+				var identifier = new Name(si.getSymbol().position, si.getSymbol().lexeme);
 				si.skip();
 				if (si.getNext().equals(OP_ASSIGN)) {
 					si.skip();
-					parseExpression();
+					var expr = parseExpression();
 					if (si.getNext().equals(OP_COMMA)) {
 						si.skip();
-						parseExpression();
+						var expr2 = parseExpression();
 						if (si.getNext().equals(OP_COMMA)) {
 							si.skip();
-							parseExpression();
+							var expr3 = parseExpression();
 							if (si.getNext().equals(OP_COLON)) {
 								si.skip();
-								parseExpression();
+								var expr4 = parseExpression();
 								if (si.getNext().equals(OP_RBRACE)) {
+									Symbol end = si.getSymbol();
 									si.skip();
+									return new For(
+											new Position(s.position.start, end.position.end),
+											identifier, expr, expr2, expr3, expr4);
 								} else {
-									Report.error(si.getSymbol().position, "Pricakoval } dobil " + si.getSymbol());
+									Report.error(si.getSymbol().position, "Pricakoval } dobil " +
+											si.getSymbol());
+									return null;
 								}
 							} else {
-								Report.error(si.getSymbol().position, "Pricakoval : dobil " + si.getSymbol());
+								Report.error(si.getSymbol().position, "Pricakoval : dobil " +
+										si.getSymbol());
+								return null;
 							}
 						} else {
-							Report.error(si.getSymbol().position, "Pricakoval , dobil " + si.getSymbol());
+							Report.error(si.getSymbol().position, "Pricakoval , dobil " +
+									si.getSymbol());
+							return null;
 						}
 					} else {
-						Report.error(si.getSymbol().position, "Pricakoval , dobil " + si.getSymbol());
+						Report.error(si.getSymbol().position, "Pricakoval , dobil " +
+								si.getSymbol());
+						return null;
 					}
 				} else {
-					Report.error(si.getSymbol().position, "Pricakoval = dobil " + si.getSymbol());
+					Report.error(si.getSymbol().position, "Pricakoval = dobil " +
+							si.getSymbol());
+					return null;
 				}
 			} else {
-				Report.error(si.getSymbol().position, "Pricakoval identifier dobil " + si.getSymbol());
+				Report.error(si.getSymbol().position, "Pricakoval identifier dobil " +
+						si.getSymbol());
+				return null;
 			}
 		} else {
 			dump("atom_expression4 -> expression = expression }");
-			parseExpression();
+			var expr = parseExpression();
 			if (si.getNext().equals(OP_ASSIGN)) {
 				si.skip();
-				parseExpression();
+				var expr2 = parseExpression();
 				if (si.getNext().equals(OP_RBRACE)) {
+					Symbol end = si.getSymbol();
 					si.skip();
+					return new Binary(
+							new Position(s.position.start, end.position.end),
+							expr, Operator.ASSIGN, expr2);
 				} else {
-					Report.error(si.getSymbol().position, "Pricakoval } dobil " + si.getSymbol());
+					Report.error(si.getSymbol().position, "Pricakoval } dobil " +
+							si.getSymbol());
+					return null;
 				}
 			} else {
-				Report.error(si.getSymbol().position, "Pricakoval = dobil " + si.getSymbol());
+				Report.error(si.getSymbol().position, "Pricakoval = dobil " +
+						si.getSymbol());
+				return null;
 			}
 		}
 	}
 
-	void parseExpressions() {
+	List<Expr> parseExpressions(List<Expr> args) {
 		dump("expressions -> expression expressions2");
-		parseExpression();
-		parseExpressions2();
+		var arg = parseExpression();
+		args.add(arg);
+		return parseExpressions2(args);
 	}
 
-	void parseExpressions2() {
+	List<Expr> parseExpressions2(List<Expr> args) {
 		if (si.getNext().equals(OP_COMMA)) {
 			dump("expressions2 -> , expression expressions2");
 			si.skip();
-			parseExpression();
-			parseExpressions2();
+			return parseExpressions(args);
 		} else {
 			dump("expressions2 -> e");
+			return args;
 		}
 	}
 

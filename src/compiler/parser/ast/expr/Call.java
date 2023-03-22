@@ -31,5 +31,8 @@ public class Call extends Expr {
         this.name = name;
     }
 
-	@Override public void accept(Visitor visitor) { visitor.visit(this); }
+    @Override
+    public void accept(Visitor visitor) {
+        visitor.visit(this);
+    }
 }
