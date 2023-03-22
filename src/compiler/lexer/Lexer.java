@@ -126,7 +126,7 @@ public class Lexer {
 
 			if (currentString.equals("	")) {
 				currentString = "";
-				col += 1;
+				col += 3;
 			}
 
 			if (currentString.length() < 1) {
