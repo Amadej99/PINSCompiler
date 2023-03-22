@@ -463,21 +463,22 @@ public class Parser {
 	}
 
 	Expr parsePrefixExpression() {
+		Symbol s = si.getSymbol();
 		if (si.getNext().equals(OP_ADD)) {
 			dump("prefix_expression -> + prefix_expression");
 			si.skip();
 			var izraz = parsePrefixExpression();
-			return new Unary(izraz.position, izraz, Unary.Operator.ADD);
+			return new Unary(new Position(s.position.start, izraz.position.end), izraz, Unary.Operator.ADD);
 		} else if (si.getNext().equals(OP_SUB)) {
 			dump("prefix_expression -> - prefix_expression");
 			si.skip();
 			var izraz = parsePrefixExpression();
-			return new Unary(izraz.position, izraz, Unary.Operator.SUB);
+			return new Unary(new Position(s.position.start, izraz.position.end), izraz, Unary.Operator.SUB);
 		} else if (si.getNext().equals(OP_NOT)) {
 			dump("prefix_expression -> ! prefix_expression");
 			si.skip();
 			var izraz = parsePrefixExpression();
-			return new Unary(izraz.position, izraz, Unary.Operator.NOT);
+			return new Unary(new Position(s.position.start, izraz.position.end), izraz, Unary.Operator.NOT);
 		} else {
 			dump("prefix_expression -> postfix_expression");
 			return parsePostfixExpression();
