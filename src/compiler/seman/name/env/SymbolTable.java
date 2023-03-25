@@ -11,6 +11,7 @@ import common.VoidOperator;
 import compiler.parser.ast.def.Def;
 
 public interface SymbolTable {
+
     /**
      * Vstavi novo definicijo v simbolno tabelo.
      * 
@@ -58,4 +59,6 @@ public interface SymbolTable {
             this.definition = definition;
         }
     }
+
+    public int getCurrentScope();
 }

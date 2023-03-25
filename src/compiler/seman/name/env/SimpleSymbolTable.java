@@ -24,7 +24,9 @@ public class SimpleSymbolTable implements SymbolTable {
      */
     @Override
     public void insert(Def definition) throws DefinitionAlreadyExistsException {
-        if (stack.isEmpty()) { throw new RuntimeException(); }
+        if (stack.isEmpty()) {
+            throw new RuntimeException();
+        }
         if (stack.get(stack.size() - 1).mapping.containsKey(definition.name)) {
             throw new DefinitionAlreadyExistsException(definition);
         }
@@ -36,7 +38,9 @@ public class SimpleSymbolTable implements SymbolTable {
      */
     @Override
     public Optional<Def> definitionFor(String name) {
-        if (stack.isEmpty()) { throw new RuntimeException(); }
+        if (stack.isEmpty()) {
+            throw new RuntimeException();
+        }
         for (int i = stack.size() - 1; i >= 0; i--) {
             var env = stack.get(i);
             if (env.mapping.containsKey(name)) {
@@ -59,11 +63,18 @@ public class SimpleSymbolTable implements SymbolTable {
      */
     @Override
     public void popScope() {
-        if (stack.isEmpty()) { throw new RuntimeException(); }
+        if (stack.isEmpty()) {
+            throw new RuntimeException();
+        }
         stack.remove(stack.size() - 1);
     }
 
     private static class Env {
         HashMap<String, Def> mapping = new HashMap<>();
+    }
+
+    @Override
+    public int getCurrentScope() {
+        return stack.size();
     }
 }

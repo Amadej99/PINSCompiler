@@ -61,7 +61,9 @@ public class FastSymbolTable implements SymbolTable {
     @Override
     public void popScope() {
         var scope = scopes.get(currentScope);
-        if (scope == null) { return; }
+        if (scope == null) {
+            return;
+        }
         for (var name : scope) {
             var definitions = env.get(name);
             if (definitions.get(definitions.size() - 1).scope != currentScope) {
@@ -81,5 +83,9 @@ public class FastSymbolTable implements SymbolTable {
             this.scope = scope;
             this.def = def;
         }
+    }
+
+    public int getCurrentScope() {
+        return currentScope;
     }
 }
