@@ -42,12 +42,11 @@ public class NameChecker implements Visitor {
 
     @Override
     public void visit(Call call) {
-        try {
-            var def = symbolTable.definitionFor(call.name);
-            def.ifPresent(value -> definitions.store(value, call));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        var def = symbolTable.definitionFor(call.name);
+        if (!(def.get() instanceof FunDef))
+            Report.error(call.name + " ni funkcija!");
+        def.ifPresent(value -> definitions.store(value, call));
+        call.arguments.stream().forEach(argument -> argument.accept(this));
     }
 
     @Override
@@ -73,7 +72,12 @@ public class NameChecker implements Visitor {
     @Override
     public void visit(Name name) {
         var def = symbolTable.definitionFor(name.name);
-        def.ifPresent(value -> definitions.store(value, name));
+        if (def.get() instanceof FunDef)
+            Report.error(name.position + " " + name.name + " je funkcija, ne spremenljivka!");
+        if (def.get() instanceof TypeDef)
+            Report.error(name.position + " " + name.name + " je tip, ne spremenljivka!");
+        def.ifPresentOrElse(value -> definitions.store(value, name),
+                () -> Report.error("Nedefinirana spremenljivka " + name.name));
     }
 
     @Override
@@ -85,8 +89,6 @@ public class NameChecker implements Visitor {
 
     @Override
     public void visit(Literal literal) {
-        // What do we do with this?
-        literal.accept(this);
     }
 
     @Override
@@ -102,63 +104,48 @@ public class NameChecker implements Visitor {
 
     @Override
     public void visit(Where where) {
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        symbolTable.inNewScope(() -> {
+            where.expr.accept(this);
+            where.defs.accept(this);
+        });
     }
 
     @Override
     public void visit(Defs defs) {
-        try {
-            defs.definitions.stream().forEach(def -> {
-                try {
-                    symbolTable.insert(def);
-                } catch (DefinitionAlreadyExistsException e) {
-                    Report.error("Error in NameChecker.visit(Defs defs)");
-                }
-            });
-            defs.definitions.stream().forEach(def -> def.accept(this));
-        } catch (Exception e) {
-            Report.error("Error in NameChecker.visit(Defs defs)");
-        }
+        defs.definitions.stream().forEach(def -> {
+            try {
+                symbolTable.insert(def);
+            } catch (DefinitionAlreadyExistsException e) {
+                Report.error("Error in NameChecker.visit(Defs defs)");
+            }
+        });
+        defs.definitions.stream().forEach(def -> def.accept(this));
     }
 
     @Override
     public void visit(FunDef funDef) {
-        try {
-            if (symbolTable.getCurrentScope() != 0)
-                symbolTable.insert(funDef);
-            symbolTable.inNewScope(() -> {
-                funDef.parameters.stream().forEach(parameter -> parameter.accept(this));
-                funDef.body.accept(this);
-            });
-        } catch (DefinitionAlreadyExistsException e) {
-            Report.error("Function " + funDef.name + " already defined " + funDef.position);
-        }
+        symbolTable.inNewScope(() -> {
+            funDef.parameters.stream().forEach(parameter -> parameter.accept(this));
+            funDef.type.accept(this);
+            funDef.body.accept(this);
+        });
     }
 
     @Override
     public void visit(TypeDef typeDef) {
-        try {
-            if (symbolTable.getCurrentScope() != 0)
-                symbolTable.insert(typeDef);
-        } catch (DefinitionAlreadyExistsException e) {
-            Report.error("Error in NameChecker.visit(TypeDef typeDef)");
-        }
+        typeDef.type.accept(this);
     }
 
     @Override
     public void visit(VarDef varDef) {
-        try {
-            if (symbolTable.getCurrentScope() != 0)
-                symbolTable.insert(varDef);
-        } catch (DefinitionAlreadyExistsException e) {
-            Report.error("Error in NameChecker definition already exists " + varDef.name + " " + varDef.position);
-        }
+        varDef.type.accept(this);
     }
 
     @Override
     public void visit(Parameter parameter) {
         try {
             symbolTable.insert(parameter);
+            parameter.type.accept(this);
         } catch (DefinitionAlreadyExistsException e) {
             Report.error("Error in NameChecker.visit(Parameter parameter)");
         }
@@ -166,18 +153,27 @@ public class NameChecker implements Visitor {
 
     @Override
     public void visit(Array array) {
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        array.type.accept(this);
     }
 
     @Override
     public void visit(Atom atom) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
     }
 
     @Override
     public void visit(TypeName name) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        var def = symbolTable.definitionFor(name.identifier);
+        if ((def.get() instanceof VarDef)) {
+            Report.error(name.position + " " + name.identifier + " je spremenljvka, ne tip!");
+        }
+        if ((def.get() instanceof FunDef)) {
+            Report.error(name.position + " " + name.identifier + " je funkcija, ne tip!");
+        }
+        if ((def.get() instanceof Parameter)) {
+            Report.error(name.position + " " + name.identifier + " je parameter, ne tip!");
+        }
+
+        def.ifPresentOrElse(value -> definitions.store(value, name),
+                () -> Report.error(name.position + " Nedefiniran tip " + name.identifier));
     }
 }
