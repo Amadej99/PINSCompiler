@@ -47,6 +47,8 @@ public class NameChecker implements Visitor {
             Report.error(call.name + " ni funkcija!");
         def.ifPresent(value -> definitions.store(value, call));
         call.arguments.stream().forEach(argument -> argument.accept(this));
+        // Preveriti bo treba ali so argumenti tipa var.
+        // Kasneje bo treba se preveriti, ali so argumenti pravilne vrste.
     }
 
     @Override
@@ -105,8 +107,8 @@ public class NameChecker implements Visitor {
     @Override
     public void visit(Where where) {
         symbolTable.inNewScope(() -> {
-            where.expr.accept(this);
             where.defs.accept(this);
+            where.expr.accept(this);
         });
     }
 
@@ -119,14 +121,16 @@ public class NameChecker implements Visitor {
                 Report.error("Error in NameChecker.visit(Defs defs)");
             }
         });
+
         defs.definitions.stream().forEach(def -> def.accept(this));
     }
 
     @Override
     public void visit(FunDef funDef) {
+        funDef.type.accept(this);
+        funDef.parameters.stream().forEach(parameter -> parameter.type.accept(this));
         symbolTable.inNewScope(() -> {
             funDef.parameters.stream().forEach(parameter -> parameter.accept(this));
-            funDef.type.accept(this);
             funDef.body.accept(this);
         });
     }
@@ -145,7 +149,6 @@ public class NameChecker implements Visitor {
     public void visit(Parameter parameter) {
         try {
             symbolTable.insert(parameter);
-            parameter.type.accept(this);
         } catch (DefinitionAlreadyExistsException e) {
             Report.error("Error in NameChecker.visit(Parameter parameter)");
         }
