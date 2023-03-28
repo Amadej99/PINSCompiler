@@ -166,17 +166,16 @@ public class NameChecker implements Visitor {
     @Override
     public void visit(TypeName name) {
         var def = symbolTable.definitionFor(name.identifier);
-        if ((def.get() instanceof VarDef)) {
-            Report.error(name.position + " " + name.identifier + " je spremenljvka, ne tip!");
-        }
-        if ((def.get() instanceof FunDef)) {
-            Report.error(name.position + " " + name.identifier + " je funkcija, ne tip!");
-        }
-        if ((def.get() instanceof Parameter)) {
-            Report.error(name.position + " " + name.identifier + " je parameter, ne tip!");
-        }
-
-        def.ifPresentOrElse(value -> definitions.store(value, name),
+        def.ifPresentOrElse(value -> {
+            if ((def.get() instanceof VarDef)) {
+                Report.error(name.position + " " + name.identifier + " je spremenljvka, ne tip!");
+            } else if ((def.get() instanceof FunDef)) {
+                Report.error(name.position + " " + name.identifier + " je funkcija, ne tip!");
+            } else if ((def.get() instanceof Parameter)) {
+                Report.error(name.position + " " + name.identifier + " je parameter, ne tip!");
+            } else
+                definitions.store(value, name);
+        },
                 () -> Report.error(name.position + " Nedefiniran tip " + name.identifier));
     }
 }
