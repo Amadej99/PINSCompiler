@@ -159,7 +159,7 @@ public class Lexer {
 		}
 
 		if (currentString.length() > 0) {
-			if (findMatch(backTrack(currentString)) == COMMENT)
+			if (findMatch(backTrack(currentString)) == COMMENT && currentString.isBlank())
 				currentString = "";
 			else {
 				symbols.add(addSymbol(startLine, startCol, findMatch(currentString), currentString));
