@@ -67,7 +67,8 @@ public abstract class Type {
      * vrne `Optional.empty()`.
      */
     public Optional<Atom> asAtom() {
-        if (this instanceof Atom t) return Optional.of(t);
+        if (this instanceof Atom t)
+            return Optional.of(t);
         return Optional.empty();
     }
 
@@ -83,7 +84,8 @@ public abstract class Type {
      * vrne `Optional.empty()`.
      */
     public Optional<Array> asArray() {
-        if (this instanceof Array t) return Optional.of(t);
+        if (this instanceof Array t)
+            return Optional.of(t);
         return Optional.empty();
     }
 
@@ -99,7 +101,8 @@ public abstract class Type {
      * vrne `Optional.empty()`.
      */
     public Optional<Function> asFunction() {
-        if (this instanceof Function t) return Optional.of(t);
+        if (this instanceof Function t)
+            return Optional.of(t);
         return Optional.empty();
     }
 
@@ -133,16 +136,25 @@ public abstract class Type {
 
         @Override
         public boolean equals(Type t) {
-            throw new RuntimeException("Implementiraj ...");
+            if (t.isAtom()) {
+                if (t.asAtom().isPresent()) {
+                    return t.asAtom().get().kind == this.kind;
+                }
+            }
+            return false;
         }
 
         @Override
         public String toString() {
             return switch (kind) {
-                case INT: yield "int";
-                case STR: yield "str";
-                case LOG: yield "log";
-                case VOID: yield "void";
+                case INT:
+                    yield "int";
+                case STR:
+                    yield "str";
+                case LOG:
+                    yield "log";
+                case VOID:
+                    yield "void";
             };
         }
 
@@ -198,7 +210,7 @@ public abstract class Type {
 
         @Override
         public String toString() {
-            return "ARR("+size+","+type.toString()+")";
+            return "ARR(" + size + "," + type.toString() + ")";
         }
     }
 
@@ -210,7 +222,7 @@ public abstract class Type {
          * Tipi parametrov.
          */
         public final List<Type> parameters;
-        
+
         /**
          * Tip, ki ga funkcija vrača.
          */
@@ -235,15 +247,20 @@ public abstract class Type {
 
         @Override
         public boolean equals(Type t) {
-            throw new RuntimeException("Implementiraj ...");
+            if (t.isFunction()) {
+                if (t.asFunction().isPresent()) {
+                    return t.asFunction().get().equals(this.returnType);
+                }
+            }
+            return false;
         }
 
         @Override
         public String toString() {
             var params = parameters.stream()
-                .map(t -> t.toString())
-                .collect(Collectors.joining(", "));
-            return "(" +  params + ") -> " + returnType.toString();
+                    .map(t -> t.toString())
+                    .collect(Collectors.joining(", "));
+            return "(" + params + ") -> " + returnType.toString();
         }
     }
 }
