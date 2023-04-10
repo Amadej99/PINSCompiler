@@ -83,8 +83,26 @@ public class TypeChecker implements Visitor {
 
     @Override
     public void visit(For forLoop) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        forLoop.counter.accept(this);
+        forLoop.low.accept(this);
+        forLoop.high.accept(this);
+        forLoop.body.accept(this);
+        forLoop.step.accept(this);
+
+        var counterType = types.valueFor(forLoop.counter);
+        counterType.ifPresentOrElse(value -> value.asAtom().get().kind.equals(Kind.INT),
+                () -> Report.error("Neveljaven tip števca v for zanki!"));
+        var lowType = types.valueFor(forLoop.low);
+        lowType.ifPresentOrElse(value -> value.asAtom().get().kind.equals(Kind.INT),
+                () -> Report.error("Neveljaven tip spodnje meje v for zanki!"));
+        var highType = types.valueFor(forLoop.high);
+        highType.ifPresentOrElse(value -> value.asAtom().get().kind.equals(Kind.INT),
+                () -> Report.error("Neveljaven tip zgornje meje v for zanki!"));
+        var stepType = types.valueFor(forLoop.step);
+        stepType.ifPresentOrElse(value -> value.asAtom().get().kind.equals(Kind.INT),
+                () -> Report.error("Neveljaven tip inkrementa v for zanki!"));
+
+        types.store(new Type.Atom(Kind.VOID), forLoop);
     }
 
     @Override
