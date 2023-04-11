@@ -67,6 +67,30 @@ public class TypeChecker implements Visitor {
 
         var leftType = types.valueFor(binary.left);
         var rightType = types.valueFor(binary.right);
+
+        if (leftType.isPresent() && rightType.isPresent()) {
+            if (binary.operator.isAndOr()) {
+                if (leftType.get().isLog() && rightType.get().isLog()) {
+                    types.store(new Type.Atom(Kind.LOG), binary);
+                } else {
+                    Report.error("Napaka pri logičnem izrazu!");
+                }
+            } else if (binary.operator.isArithmetic()) {
+                if (leftType.get().isInt() && rightType.get().isInt()) {
+                    types.store(new Type.Atom(Kind.INT), binary);
+                } else {
+                    Report.error("Napaka pri aritmetičnem izrazu!");
+                }
+            } else if (binary.operator.isComparison()) {
+                if (leftType.get().isInt() && rightType.get().isInt()) {
+                    types.store(new Type.Atom(Kind.LOG), binary);
+                } else if (leftType.get().isLog() && rightType.get().isLog()) {
+                    types.store(new Type.Atom(Kind.LOG), binary);
+                } else {
+                    Report.error("Napaka pri primerjalnem izrazu!");
+                }
+            }
+        }
     }
 
     @Override
@@ -90,17 +114,25 @@ public class TypeChecker implements Visitor {
         forLoop.step.accept(this);
 
         var counterType = types.valueFor(forLoop.counter);
-        counterType.ifPresentOrElse(value -> value.asAtom().get().kind.equals(Kind.INT),
-                () -> Report.error("Neveljaven tip števca v for zanki!"));
+        counterType.ifPresentOrElse(value -> {
+            if (!value.isInt())
+                Report.error("Neveljaven tip števca v for zanki!");
+        }, () -> Report.error("Napaka v števcu zanke!"));
         var lowType = types.valueFor(forLoop.low);
-        lowType.ifPresentOrElse(value -> value.asAtom().get().kind.equals(Kind.INT),
-                () -> Report.error("Neveljaven tip spodnje meje v for zanki!"));
+        lowType.ifPresentOrElse(value -> {
+            if (!value.isInt())
+                Report.error("Neveljaven tip spodnje meje v for zanki!");
+        }, () -> Report.error("Napaka v spodnji meji zanke!"));
         var highType = types.valueFor(forLoop.high);
-        highType.ifPresentOrElse(value -> value.asAtom().get().kind.equals(Kind.INT),
-                () -> Report.error("Neveljaven tip zgornje meje v for zanki!"));
+        highType.ifPresentOrElse(value -> {
+            if (!value.isInt())
+                Report.error("Neveljaven tip zgornje meje v for zanki!");
+        }, () -> Report.error("Napaka v zgornji meji zanke!"));
         var stepType = types.valueFor(forLoop.step);
-        stepType.ifPresentOrElse(value -> value.asAtom().get().kind.equals(Kind.INT),
-                () -> Report.error("Neveljaven tip inkrementa v for zanki!"));
+        stepType.ifPresentOrElse(value -> {
+            if (!value.isInt())
+                Report.error("Neveljaven tip inkrementa v for zanki!");
+        }, () -> Report.error("Napaka v inkrementu zanke!"));
 
         types.store(new Type.Atom(Kind.VOID), forLoop);
     }
@@ -241,17 +273,23 @@ public class TypeChecker implements Visitor {
     @Override
     public void visit(TypeName name) {
         var def = definitions.valueFor(name);
-        def.ifPresentOrElse(value -> {
-            var findType = types.valueFor(value);
-            findType.ifPresentOrElse(type -> {
-                var asAtom = type.asAtom();
-                asAtom.ifPresentOrElse(finalValue -> {
-                    types.store(finalValue, name);
+        if (def.isPresent()) {
+            var getDef = def.get();
+            var findType = types.valueFor(getDef);
+            if (!findType.isPresent()) {
+                getDef.accept(this);
+                findType = types.valueFor(getDef);
+            }
+            if (findType.isPresent()) {
+                var getType = findType.get();
+                var asAtom = getType.asAtom();
+                if (asAtom.isPresent()) {
+                    types.store(asAtom.get(), name);
                     return;
-                },
-                        () -> Report.error("Type " + name.identifier + " is not defined " + name.position));
-            }, () -> Report.error("Type " + name.identifier + " is not defined " + name.position));
-        },
-                () -> Report.error("Type " + name.identifier + " is not defined " + name.position));
+                }
+            }
+        }
+
+        Report.error("Type " + name.identifier + " is not defined " + name.position);
     }
 }
