@@ -14,6 +14,7 @@ import compiler.common.Visitor;
 import compiler.parser.ast.def.*;
 import compiler.parser.ast.def.FunDef.Parameter;
 import compiler.parser.ast.expr.*;
+import compiler.parser.ast.expr.Unary.Operator;
 import compiler.parser.ast.type.*;
 import compiler.seman.common.NodeDescription;
 import compiler.seman.type.type.Type;
@@ -148,8 +149,18 @@ public class TypeChecker implements Visitor {
 
     @Override
     public void visit(IfThenElse ifThenElse) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        ifThenElse.condition.accept(this);
+        ifThenElse.thenExpression.accept(this);
+        if (ifThenElse.elseExpression.isPresent())
+            ifThenElse.elseExpression.get().accept(this);
+
+        var conditionType = types.valueFor(ifThenElse.condition);
+        conditionType.ifPresentOrElse(value -> {
+            if (!value.isLog())
+                Report.error("Neveljaven tip pogojne izjave!");
+        }, () -> Report.error("Napaka v pogojni izjavi!"));
+
+        types.store(new Type.Atom(Kind.VOID), ifThenElse);
     }
 
     @Override
@@ -171,20 +182,45 @@ public class TypeChecker implements Visitor {
 
     @Override
     public void visit(Unary unary) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        unary.expr.accept(this);
+
+        var exprType = types.valueFor(unary.expr);
+
+        exprType.ifPresentOrElse(value -> {
+            if (unary.operator.equals(Operator.NOT)) {
+                types.store(new Type.Atom(Kind.LOG), unary);
+            }
+            if (unary.operator.equals(Operator.SUB) || unary.operator.equals(Operator.ADD)) {
+                types.store(new Type.Atom(Kind.INT), unary);
+            } else {
+                Report.error("Napaka v unarnem izrazu!");
+            }
+        }, () -> Report.error("Napaka v izrazu!"));
     }
 
     @Override
     public void visit(While whileLoop) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        whileLoop.condition.accept(this);
+        whileLoop.body.accept(this);
+
+        var conditionType = types.valueFor(whileLoop.condition);
+        conditionType.ifPresentOrElse(value -> {
+            if (!value.isLog())
+                Report.error("Neveljaven tip pogoja v while zanki!");
+        }, () -> Report.error("Napaka v pogoju zanke!"));
+
+        types.store(new Type.Atom(Kind.VOID), whileLoop);
     }
 
     @Override
     public void visit(Where where) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        where.defs.accept(this);
+        where.expr.accept(this);
+
+        var exprType = types.valueFor(where.expr);
+        exprType.ifPresentOrElse(value -> types.store(value, where), () -> {
+            Report.error("Neveljaven tip izraza!");
+        });
     }
 
     @Override
