@@ -311,7 +311,7 @@ public class TypeChecker implements Visitor {
         var def = types.valueFor(typeDef.type);
         def.ifPresentOrElse(value -> {
             types.store(value, typeDef);
-        }, () -> Report.error("Type " + typeDef.name + " is not defined " + typeDef.position));
+        }, () -> Report.error(typeDef.position, "Type " + typeDef.name + " is not defined " + typeDef.position));
     }
 
     @Override
@@ -320,7 +320,8 @@ public class TypeChecker implements Visitor {
         var def = types.valueFor(varDef.type);
         def.ifPresentOrElse(value -> {
             types.store(value, varDef);
-        }, () -> Report.error("The type of the variable " + varDef.name + " is not defined " + varDef.position));
+        }, () -> Report.error(varDef.position,
+                "The type of the variable " + varDef.name + " is not defined " + varDef.position));
     }
 
     @Override
@@ -329,7 +330,8 @@ public class TypeChecker implements Visitor {
         var def = types.valueFor(parameter.type);
         def.ifPresentOrElse(value -> {
             types.store(value, parameter);
-        }, () -> Report.error("The type of the parameter " + parameter.name + " is not defined " + parameter.position));
+        }, () -> Report.error(parameter.position,
+                "The type of the parameter " + parameter.name + " is not defined " + parameter.position));
     }
 
     @Override
@@ -373,23 +375,25 @@ public class TypeChecker implements Visitor {
     @Override
     public void visit(TypeName name) {
         var def = definitions.valueFor(name);
-        if (def.isPresent()) {
-            var getDef = def.get();
-            var findType = types.valueFor(getDef);
+        def.ifPresentOrElse(value -> {
+            var findType = types.valueFor(value);
             if (!findType.isPresent()) {
-                getDef.accept(this);
-                findType = types.valueFor(getDef);
+                value.accept(this);
+                findType = types.valueFor(value);
             }
-            if (findType.isPresent()) {
-                var getType = findType.get();
-                var asAtom = getType.asAtom();
-                if (asAtom.isPresent()) {
-                    types.store(asAtom.get(), name);
+            findType.ifPresentOrElse(type -> {
+                var asAtom = type.asAtom();
+                asAtom.ifPresent(atom -> {
+                    types.store(atom, name);
                     return;
-                }
-            }
-        }
+                });
 
-        Report.error("Type " + name.identifier + " is not defined " + name.position);
+                var asArray = type.asArray();
+                asArray.ifPresent(array -> {
+                    types.store(array, name);
+                    return;
+                });
+            }, () -> Report.error("The type of the type " + name.position + " is not defined"));
+        }, () -> Report.error("Definition of the type " + name.position + " is not defined"));
     }
 }
