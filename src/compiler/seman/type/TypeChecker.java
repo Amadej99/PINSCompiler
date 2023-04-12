@@ -118,12 +118,12 @@ public class TypeChecker implements Visitor {
                     types.store(new Type.Atom(Kind.LOG), binary);
                     return;
                 } else {
-                    Report.error("Napaka pri primerjalnem izrazu!");
+                    Report.error(binary.position, "Napaka pri primerjalnem izrazu!");
                 }
             } else if (binary.operator.equals(Binary.Operator.ARR)) {
                 if (leftType.get().isArray() && rightType.get().isInt()) {
                     var asArray = leftType.get().asArray();
-                    types.store(asArray.get(), binary);
+                    types.store(asArray.get().type, binary);
                     return;
                 }
             } else if (binary.operator.equals(Binary.Operator.ASSIGN)) {
@@ -336,8 +336,19 @@ public class TypeChecker implements Visitor {
     public void visit(Array array) {
         array.type.accept(this);
         var def = types.valueFor(array.type);
+
         def.ifPresentOrElse(value -> {
-            types.store(new Type.Array(array.size, value), array);
+            var asAtom = value.asAtom();
+            asAtom.ifPresent(value2 -> {
+                types.store(new Type.Array(array.size, value2), array);
+                return;
+            });
+
+            var asArray = value.asArray();
+            asArray.ifPresent(value3 -> {
+                types.store(new Type.Array(array.size, value3), array);
+                return;
+            });
         }, () -> Report.error("The type of the array " + array.position + " is not defined"));
     }
 

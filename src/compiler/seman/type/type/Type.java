@@ -205,7 +205,12 @@ public abstract class Type {
 
         @Override
         public boolean equals(Type t) {
-            throw new RuntimeException("Implementiraj ...");
+            if (t.isArray()) {
+                if (t.asArray().isPresent()) {
+                    return t.asArray().get().size == this.size && t.asArray().get().type.equals(this.type);
+                }
+            }
+            return false;
         }
 
         @Override
