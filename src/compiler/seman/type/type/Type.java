@@ -249,7 +249,7 @@ public abstract class Type {
         public boolean equals(Type t) {
             if (t.isFunction()) {
                 if (t.asFunction().isPresent()) {
-                    return t.asFunction().get().equals(this.returnType);
+                    return this.returnType.equals(t.asFunction().get().returnType);
                 }
             }
             return false;

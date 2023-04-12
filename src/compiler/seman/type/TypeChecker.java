@@ -8,6 +8,7 @@ package compiler.seman.type;
 import static common.RequireNonNull.requireNonNull;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import common.Report;
 import compiler.common.Visitor;
@@ -37,28 +38,53 @@ public class TypeChecker implements Visitor {
         this.types = types;
     }
 
+    HashSet<TypeDef> hashSet = new HashSet<TypeDef>();
+
     @Override
     public void visit(Call call) {
+        var argumentTypes = new ArrayList<Type>();
+        call.arguments.stream().forEach(argument -> argument.accept(this));
+
+        call.arguments.stream().forEach(argument -> {
+            var findType = types.valueFor(argument);
+            findType.ifPresentOrElse(value -> {
+                argumentTypes.add(value);
+            }, () -> Report.error("Napacen tip v argumentu!"));
+        });
+
         var def = definitions.valueFor(call);
-        def.ifPresent(value -> {
-            var type = types.valueFor(value);
-            type.ifPresent(typeValue -> {
-                typeValue.asFunction().ifPresent(function -> {
-                    if (function.parameters.size() != call.arguments.size())
-                        Report.error("Napačno število argumentov!");
-                    for (int i = 0; i < function.parameters.size(); i++) {
-                        call.arguments.get(i).accept(this);
-                        var argumentType = types.valueFor(call.arguments.get(i));
-                        if (argumentType.isPresent()) {
-                            if (!argumentType.get().equals(function.parameters.get(i))) {
-                                Report.error("Argument " + i + " ni pravilnega tipa!");
-                            }
+        if (def.isPresent()) {
+            var getDef = def.get();
+            var findType = types.valueFor(getDef);
+
+            if (!findType.isPresent()) {
+                getDef.accept(this);
+                findType = types.valueFor(getDef);
+            }
+
+            if (findType.isPresent()) {
+                var getType = findType.get();
+                var asFunc = getType.asFunction();
+                if (asFunc.isPresent()) {
+                    var getAsFunc = asFunc.get();
+                    if (getAsFunc.parameters.size() != argumentTypes.size()) {
+                        Report.error("Napacno stevilo argumentov!");
+                    }
+                    for (int i = 0; i < getAsFunc.parameters.size(); i++) {
+                        if (!(getAsFunc.parameters.get(i).equals(argumentTypes.get(i)))) {
+                            Report.error(call.position, "Argument napacnega tipa!");
                         }
                     }
-                    types.store(function.returnType, call);
-                });
-            });
-        });
+
+                    var compareFunc = new Type.Function(argumentTypes, getAsFunc.returnType);
+                    if (getAsFunc.equals(compareFunc)) {
+                        types.store(getAsFunc.returnType, call);
+                        return;
+                    }
+                }
+            }
+            Report.error("Tip funkcije ni definiran!");
+        }
     }
 
     @Override
@@ -73,22 +99,38 @@ public class TypeChecker implements Visitor {
             if (binary.operator.isAndOr()) {
                 if (leftType.get().isLog() && rightType.get().isLog()) {
                     types.store(new Type.Atom(Kind.LOG), binary);
+                    return;
                 } else {
                     Report.error("Napaka pri logičnem izrazu!");
                 }
             } else if (binary.operator.isArithmetic()) {
                 if (leftType.get().isInt() && rightType.get().isInt()) {
                     types.store(new Type.Atom(Kind.INT), binary);
+                    return;
                 } else {
                     Report.error("Napaka pri aritmetičnem izrazu!");
                 }
             } else if (binary.operator.isComparison()) {
                 if (leftType.get().isInt() && rightType.get().isInt()) {
                     types.store(new Type.Atom(Kind.LOG), binary);
+                    return;
                 } else if (leftType.get().isLog() && rightType.get().isLog()) {
                     types.store(new Type.Atom(Kind.LOG), binary);
+                    return;
                 } else {
                     Report.error("Napaka pri primerjalnem izrazu!");
+                }
+            } else if (binary.operator.equals(Binary.Operator.ARR)) {
+                if (leftType.get().isArray() && rightType.get().isInt()) {
+                    var asArray = leftType.get().asArray();
+                    types.store(asArray.get(), binary);
+                    return;
+                }
+            } else if (binary.operator.equals(Binary.Operator.ASSIGN)) {
+                if (leftType.get().equals(rightType.get()) && (rightType.get().isLog()) || rightType.get().isInt()
+                        || rightType.get().isStr()) {
+                    types.store(leftType.get(), binary);
+                    return;
                 }
             }
         }
@@ -151,8 +193,7 @@ public class TypeChecker implements Visitor {
     public void visit(IfThenElse ifThenElse) {
         ifThenElse.condition.accept(this);
         ifThenElse.thenExpression.accept(this);
-        if (ifThenElse.elseExpression.isPresent())
-            ifThenElse.elseExpression.get().accept(this);
+        ifThenElse.elseExpression.ifPresent(value -> value.accept(this));
 
         var conditionType = types.valueFor(ifThenElse.condition);
         conditionType.ifPresentOrElse(value -> {
@@ -234,27 +275,36 @@ public class TypeChecker implements Visitor {
     public void visit(FunDef funDef) {
         funDef.parameters.stream().forEach(param -> param.accept(this));
         funDef.type.accept(this);
+
+        var parameterTypes = new ArrayList<Type>();
+        funDef.parameters.stream().forEach(param -> {
+            var paramType = types.valueFor(param);
+            paramType.ifPresentOrElse(value -> parameterTypes.add(value),
+                    () -> Report.error("Napaka v tipu parametra!"));
+        });
+
+        var funType = types.valueFor(funDef.type);
+        funType.ifPresentOrElse(value -> types.store(new Type.Function(parameterTypes, value), funDef),
+                () -> Report.error("Napaka v tipih funkcije"));
+
         funDef.body.accept(this);
         var bodyType = types.valueFor(funDef.body);
-        if (bodyType.isPresent()) {
-            var funType = types.valueFor(funDef.type);
-            if (funType.isPresent()) {
-                if (bodyType.get().equals(funType.get())) {
-                    ArrayList<Type> paramTypes = new ArrayList<>();
-                    funDef.parameters.stream().forEach(param -> {
-                        var paramType = types.valueFor(param);
-                        paramType.ifPresent(value -> paramTypes.add(value));
-                    });
-                    types.store(new Type.Function(paramTypes, funType.get()), funDef);
-                    return;
-                }
-                Report.error("Function mismatch! " + funDef.name + " " + funType.get() + " " + bodyType.get());
+        bodyType.ifPresentOrElse(value -> {
+            var getFunType = funType.get();
+            if (getFunType.equals(value)) {
+                types.store(new Type.Function(parameterTypes, getFunType), funDef);
+                return;
+            } else {
+                Report.error("Neveljaven return type v funkciji!");
             }
-        }
+        }, () -> Report.error("Napaka v body funkcije!"));
     }
 
     @Override
     public void visit(TypeDef typeDef) {
+        if (hashSet.contains(typeDef))
+            Report.error("Zaznan cikel!");
+        hashSet.add(typeDef);
         typeDef.type.accept(this);
         var def = types.valueFor(typeDef.type);
         def.ifPresentOrElse(value -> {
@@ -291,6 +341,7 @@ public class TypeChecker implements Visitor {
 
     @Override
     public void visit(Atom atom) {
+        hashSet.clear();
         switch (atom.type) {
             case INT:
                 types.store(new Type.Atom(Kind.INT), atom);
