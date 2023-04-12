@@ -125,13 +125,15 @@ public class TypeChecker implements Visitor {
                     var asArray = leftType.get().asArray();
                     types.store(asArray.get().type, binary);
                     return;
-                }
+                } else
+                    Report.error("Napaka pri izrazu s tabelami!");
             } else if (binary.operator.equals(Binary.Operator.ASSIGN)) {
-                if (leftType.get().equals(rightType.get()) && (rightType.get().isLog()) || rightType.get().isInt()
-                        || rightType.get().isStr()) {
+                if (leftType.get().equals(rightType.get()) && ((rightType.get().isLog()) || rightType.get().isInt()
+                        || rightType.get().isStr())) {
                     types.store(leftType.get(), binary);
                     return;
-                }
+                } else
+                    Report.error(binary.position, "Nedovoljeno prirejanje!");
             }
         }
     }
@@ -224,9 +226,7 @@ public class TypeChecker implements Visitor {
     @Override
     public void visit(Unary unary) {
         unary.expr.accept(this);
-
         var exprType = types.valueFor(unary.expr);
-
         exprType.ifPresentOrElse(value -> {
             if (value.isLog() && unary.operator.equals(Operator.NOT)) {
                 types.store(new Type.Atom(Kind.LOG), unary);
@@ -259,7 +259,6 @@ public class TypeChecker implements Visitor {
     public void visit(Where where) {
         where.defs.accept(this);
         where.expr.accept(this);
-
         var exprType = types.valueFor(where.expr);
         exprType.ifPresentOrElse(value -> types.store(value, where), () -> {
             Report.error("Neveljaven tip izraza!");
