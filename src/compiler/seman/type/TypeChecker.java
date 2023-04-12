@@ -228,11 +228,13 @@ public class TypeChecker implements Visitor {
         var exprType = types.valueFor(unary.expr);
 
         exprType.ifPresentOrElse(value -> {
-            if (unary.operator.equals(Operator.NOT)) {
+            if (value.isLog() && unary.operator.equals(Operator.NOT)) {
                 types.store(new Type.Atom(Kind.LOG), unary);
+                return;
             }
-            if (unary.operator.equals(Operator.SUB) || unary.operator.equals(Operator.ADD)) {
+            if (value.isInt() && (unary.operator.equals(Operator.SUB) || unary.operator.equals(Operator.ADD))) {
                 types.store(new Type.Atom(Kind.INT), unary);
+                return;
             } else {
                 Report.error("Napaka v unarnem izrazu!");
             }
