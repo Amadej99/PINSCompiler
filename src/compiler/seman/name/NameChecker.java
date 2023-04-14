@@ -43,9 +43,12 @@ public class NameChecker implements Visitor {
     @Override
     public void visit(Call call) {
         var def = symbolTable.definitionFor(call.name);
-        if (!(def.get() instanceof FunDef))
-            Report.error(call.name + " ni funkcija!");
-        def.ifPresent(value -> definitions.store(value, call));
+        def.ifPresentOrElse(value -> {
+            if (!(def.get() instanceof FunDef))
+                Report.error(call.name + " ni funkcija!");
+            definitions.store(value, call);
+        },
+                () -> Report.error(call.position + " " + call.name + " ni definirana!"));
         call.arguments.stream().forEach(argument -> argument.accept(this));
         // Preveriti bo treba ali so argumenti tipa var.
         // Kasneje bo treba se preveriti, ali so argumenti pravilne vrste.
@@ -121,7 +124,7 @@ public class NameChecker implements Visitor {
             try {
                 symbolTable.insert(def);
             } catch (DefinitionAlreadyExistsException e) {
-                Report.error("Error in NameChecker.visit(Defs defs)");
+                Report.error("Definition already exists! " + def.name + def.position);
             }
         });
 
