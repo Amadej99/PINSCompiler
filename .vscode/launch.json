@@ -1,0 +1,12 @@
+{
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Main",
+      "request": "launch",
+      "mainClass": "Main",
+      "projectName": "PINSCompiler_e8d56c1a",
+      "args": "PINS pins.txt --dump FRM --exec FRM"
+    }
+  ]
+}
