@@ -28,7 +28,7 @@ import compiler.seman.type.type.Type;
 public class Main {
     /**
      * Metoda, ki izvede celotni proces prevajanja.
-     * 
+     *
      * @param args parametri ukazne vrstice.
      */
     public static void main(String[] args) throws Exception {
@@ -61,7 +61,7 @@ public class Main {
         /**
          * Izvedi sintaksno analizo.
          */
-        Optional<PrintStream> out = cli.dumpPhases.contains(Phase.SYN) 
+        Optional<PrintStream> out = cli.dumpPhases.contains(Phase.SYN)
                 ? Optional.of(System.out)
                 : Optional.empty();
         var parser = new Parser(symbols, out);

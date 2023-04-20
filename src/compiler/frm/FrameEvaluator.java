@@ -69,14 +69,7 @@ public class FrameEvaluator implements Visitor {
     @Override
     public void visit(Call call) {
         call.arguments.forEach(arg -> arg.accept(this));
-//        int argumentsSize = 0;
-        int argumentsSize = call.arguments.stream().map(arg -> types.valueFor(arg).get().sizeInBytes()).mapToInt(Integer::intValue).sum();
-//        for(Expr argument : call.arguments){
-//            var type = types.valueFor(argument);
-//            if(type.isPresent()){
-//                argumentsSize += type.get().sizeInBytes();
-//            }
-//        }
+        int argumentsSize = call.arguments.stream().map(arg -> types.valueFor(arg).get()).mapToInt(type -> type.sizeInBytes()).sum();
         builders.peek().addFunctionCall(argumentsSize + Constants.WordSize);
     }
 
@@ -151,12 +144,10 @@ public class FrameEvaluator implements Visitor {
     @Override
     public void visit(FunDef funDef) {
         inNewScope(() -> {
-            //Mogoce bi moral ta builder ven iz novega scopea
             Frame.Builder builder = new Frame.Builder(staticLevel > 1 ? Frame.Label.nextAnonymous() : Frame.Label.named(funDef.name), staticLevel);
             builders.push(builder);
 
-            if (staticLevel > 1)
-                builders.peek().addParameter(Constants.WordSize);
+            builders.peek().addParameter(Constants.WordSize);
 
             funDef.parameters.stream().forEach(parameter -> parameter.accept(this));
             funDef.body.accept(this);
@@ -177,7 +168,7 @@ public class FrameEvaluator implements Visitor {
         types.valueFor(varDef).ifPresent(type -> {
             int size = type.sizeInBytes();
             Access acc;
-            if (staticLevel > 1)
+            if (staticLevel > 0)
                 acc = new Access.Local(size, builders.peek().addLocalVariable(size), staticLevel);
             else
                 acc = new Access.Global(size, Frame.Label.named(varDef.name));
