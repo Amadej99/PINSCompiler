@@ -69,7 +69,7 @@ public class FrameEvaluator implements Visitor {
     @Override
     public void visit(Call call) {
         call.arguments.forEach(arg -> arg.accept(this));
-        int argumentsSize = call.arguments.stream().map(arg -> types.valueFor(arg).get()).mapToInt(type -> type.sizeInBytes()).sum();
+        int argumentsSize = call.arguments.stream().map(arg -> types.valueFor(arg).get()).mapToInt(type -> type.sizeInBytesAsParam()).sum();
         builders.peek().addFunctionCall(argumentsSize + Constants.WordSize);
     }
 

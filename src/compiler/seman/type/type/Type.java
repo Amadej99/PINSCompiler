@@ -242,11 +242,13 @@ public abstract class Type {
 
         @Override
         public int sizeInBytes() {
+            //Ni treba implementirat zares
             return this.parameters.stream().mapToInt(Type::sizeInBytes).sum();
         }
 
         @Override
         public int sizeInBytesAsParam() {
+            //Ni treba implementirat zares
             return Constants.WordSize;
         }
 
