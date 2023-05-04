@@ -126,12 +126,12 @@ public abstract class Type {
 
         @Override
         public int sizeInBytes() {
-            throw new RuntimeException("Implementiraj ...");
+            return this.kind.size;
         }
 
         @Override
         public int sizeInBytesAsParam() {
-            throw new RuntimeException("Implementiraj ...");
+            return this.kind.size;
         }
 
         @Override
@@ -191,12 +191,12 @@ public abstract class Type {
 
         @Override
         public int sizeInBytes() {
-            throw new RuntimeException("Implementiraj ...");
+            return this.type.sizeInBytes() * this.size;
         }
 
         @Override
         public int sizeInBytesAsParam() {
-            throw new RuntimeException("Implementiraj ...");
+            return Constants.WordSize;
         }
 
         public int elementSizeInBytes() {
@@ -242,12 +242,14 @@ public abstract class Type {
 
         @Override
         public int sizeInBytes() {
-            throw new RuntimeException("Implementiraj ...");
+            //Ni treba implementirat zares
+            return this.parameters.stream().mapToInt(Type::sizeInBytes).sum();
         }
 
         @Override
         public int sizeInBytesAsParam() {
-            throw new RuntimeException("Implementiraj ...");
+            //Ni treba implementirat zares
+            return Constants.WordSize;
         }
 
         @Override

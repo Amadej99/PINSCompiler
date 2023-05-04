@@ -1,0 +1,9 @@
+<component name="libraryTable">
+  <library name="Tests">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/src/out/production/PINSCompiler/Tests.zip!/" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

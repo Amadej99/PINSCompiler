@@ -68,7 +68,7 @@ public class TypeChecker implements Visitor {
                 if (asFunc.isPresent()) {
                     var getAsFunc = asFunc.get();
                     if (getAsFunc.parameters.size() != argumentTypes.size()) {
-                        Report.error("Napacno stevilo argumentov!");
+                        Report.error("Napačno stevilo argumentov!");
                     }
                     for (int i = 0; i < getAsFunc.parameters.size(); i++) {
                         if (!(getAsFunc.parameters.get(i).equals(argumentTypes.get(i)))) {
@@ -357,17 +357,10 @@ public class TypeChecker implements Visitor {
     public void visit(Atom atom) {
         hashSet.clear();
         switch (atom.type) {
-            case INT:
-                types.store(new Type.Atom(Kind.INT), atom);
-                break;
-            case LOG:
-                types.store(new Type.Atom(Kind.LOG), atom);
-                break;
-            case STR:
-                types.store(new Type.Atom(Kind.STR), atom);
-                break;
-            default:
-                Report.error("Unknown type " + atom.position);
+            case INT -> types.store(new Type.Atom(Kind.INT), atom);
+            case LOG -> types.store(new Type.Atom(Kind.LOG), atom);
+            case STR -> types.store(new Type.Atom(Kind.STR), atom);
+            default -> Report.error("Unknown type " + atom.position);
         }
     }
 
