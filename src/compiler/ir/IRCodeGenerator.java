@@ -88,19 +88,25 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(Binary binary) {
+        //TODO CEL BINARY
         binary.left.accept(this);
         binary.right.accept(this);
         var left = imcCode.valueFor(binary.left);
         var right = imcCode.valueFor(binary.right);
 
-        imcCode.store(new BinopExpr((IRExpr) left.get(), (IRExpr) right.get(), BinopExpr.Operator.ADD), binary);
+        if (binary.operator.equals(Binary.Operator.LT))
+            imcCode.store(new BinopExpr((IRExpr) left.get(), (IRExpr) right.get(), BinopExpr.Operator.LT), binary);
+
+        else
+            imcCode.store(new BinopExpr((IRExpr) left.get(), (IRExpr) right.get(), BinopExpr.Operator.ADD), binary);
     }
 
     @Override
     public void visit(Block block) {
         block.expressions.forEach(expr -> expr.accept(this));
         //TODO spravi v en line za Tonija <3
-        imcCode.store(new EseqExpr(new SeqStmt(block.expressions.stream().limit(block.expressions.size() - 1).map(expr -> new ExpStmt((IRExpr) imcCode.valueFor(expr).get())).collect(Collectors.toList())), (IRExpr) imcCode.valueFor(block.expressions.get(block.expressions.size() - 1)).get()), block);
+        //Tukaj fukne vn ker while ne more castat v IRExpr.
+        imcCode.store(new EseqExpr(new SeqStmt(block.expressions.stream().limit(block.expressions.size() - 1).map(expr -> imcCode.valueFor(expr).get() instanceof IRStmt irStmt ? irStmt : new ExpStmt((IRExpr) imcCode.valueFor(expr).get())).collect(Collectors.toList())), (IRExpr) imcCode.valueFor(block.expressions.get(block.expressions.size() - 1)).get()), block);
     }
 
     @Override
@@ -122,9 +128,9 @@ public class IRCodeGenerator implements Visitor {
 
         statements.add(new MoveStmt((IRExpr) imcCode.valueFor(forLoop.counter).get(), (IRExpr) imcCode.valueFor(forLoop.low).get()));
         statements.add(label0);
-        statements.add(new CJumpStmt((IRExpr) cond, label1.label, label2.label));
+        statements.add(new CJumpStmt(cond, label1.label, label2.label));
         statements.add(label1);
-        statements.add((IRStmt) imcCode.valueFor(forLoop.body).get());
+        statements.add(new ExpStmt((IRExpr) imcCode.valueFor(forLoop.body).get()));
         statements.add(new MoveStmt((IRExpr) imcCode.valueFor(forLoop.counter).get(), new BinopExpr((IRExpr) imcCode.valueFor(forLoop.counter).get(), (IRExpr) imcCode.valueFor(forLoop.step).get(), BinopExpr.Operator.ADD)));
         statements.add(new JumpStmt(label0.label));
         statements.add(label2);
