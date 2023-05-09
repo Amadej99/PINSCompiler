@@ -5,6 +5,11 @@
 
 package compiler.ir.code.expr;
 
+import common.Report;
+import compiler.parser.ast.expr.Binary;
+
+import java.util.Arrays;
+
 import static common.RequireNonNull.requireNonNull;
 
 public class BinopExpr extends IRExpr {
