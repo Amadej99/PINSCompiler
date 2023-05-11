@@ -83,35 +83,59 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(Call call) {
+        call.arguments.forEach(arg -> arg.accept(this));
 
+        var currentLevel = currentFrame.staticLevel;
+        var def = definitions.valueFor(call).get();
+
+        frames.valueFor(def).ifPresent(frame -> {
+            var binopOld = new BinopExpr(NameExpr.SP(), new ConstantExpr(currentFrame.oldFPOffset()), BinopExpr.Operator.SUB);
+            var saveFP = new MoveStmt(new MemExpr(binopOld), NameExpr.FP());
+            List<IRExpr> args = new ArrayList<>();
+
+            var diff = Math.abs(currentLevel - frame.staticLevel);
+
+            if (diff == 0)
+                args.add(new BinopExpr(new ConstantExpr(0), new ConstantExpr(1), BinopExpr.Operator.SUB));
+
+            args.add(currentFrame.staticLevel == 1 ? new ConstantExpr(-1) : NameExpr.FP());
+            call.arguments.forEach(arg -> args.add((IRExpr) imcCode.valueFor(arg).get()));
+
+            imcCode.store(new EseqExpr(saveFP, new CallExpr(frame.label, args)), call);
+        });
     }
 
     @Override
     public void visit(Binary binary) {
-        //TODO CEL BINARY
         binary.left.accept(this);
         binary.right.accept(this);
-        var left = imcCode.valueFor(binary.left);
-        var right = imcCode.valueFor(binary.right);
+        var left = imcCode.valueFor(binary.left).get();
+        var right = imcCode.valueFor(binary.right).get();
 
-        if (binary.operator.equals(Binary.Operator.LT))
-            imcCode.store(new BinopExpr((IRExpr) left.get(), (IRExpr) right.get(), BinopExpr.Operator.LT), binary);
+        if (binary.operator.equals(Binary.Operator.ASSIGN)) {
+            imcCode.store(new MoveStmt((IRExpr) left, (IRExpr) right), binary);
+        } else if (binary.operator.equals(Binary.Operator.ARR)) {
+            types.valueFor(binary).ifPresent(binaryValue -> {
+                var size = binaryValue.sizeInBytes();
+                var offset = new BinopExpr((IRExpr) right, new ConstantExpr(size), BinopExpr.Operator.MUL);
+                var location = new BinopExpr((IRExpr) left, offset, BinopExpr.Operator.ADD);
 
-        else
-            imcCode.store(new BinopExpr((IRExpr) left.get(), (IRExpr) right.get(), BinopExpr.Operator.ADD), binary);
+                imcCode.store(new MemExpr(location), binary);
+            });
+        } else {
+            imcCode.store(new BinopExpr((IRExpr) left, (IRExpr) right, BinopExpr.Operator.valueOf(binary.operator.toString())), binary);
+        }
     }
 
     @Override
     public void visit(Block block) {
         block.expressions.forEach(expr -> expr.accept(this));
         //TODO spravi v en line za Tonija <3
-        //Tukaj fukne vn ker while ne more castat v IRExpr.
         imcCode.store(new EseqExpr(new SeqStmt(block.expressions.stream().limit(block.expressions.size() - 1).map(expr -> imcCode.valueFor(expr).get() instanceof IRStmt irStmt ? irStmt : new ExpStmt((IRExpr) imcCode.valueFor(expr).get())).collect(Collectors.toList())), (IRExpr) imcCode.valueFor(block.expressions.get(block.expressions.size() - 1)).get()), block);
     }
 
     @Override
     public void visit(For forLoop) {
-        // MANJKAJO TI MEMI
         forLoop.counter.accept(this);
         forLoop.low.accept(this);
         forLoop.high.accept(this);
@@ -126,12 +150,12 @@ public class IRCodeGenerator implements Visitor {
 
         var cond = new BinopExpr((IRExpr) imcCode.valueFor(forLoop.counter).get(), (IRExpr) imcCode.valueFor(forLoop.high).get(), BinopExpr.Operator.LT);
 
-        statements.add(new MoveStmt((IRExpr) imcCode.valueFor(forLoop.counter).get(), (IRExpr) imcCode.valueFor(forLoop.low).get()));
+        statements.add(new MoveStmt(new MemExpr((IRExpr) imcCode.valueFor(forLoop.counter).get()), (IRExpr) imcCode.valueFor(forLoop.low).get()));
         statements.add(label0);
         statements.add(new CJumpStmt(cond, label1.label, label2.label));
         statements.add(label1);
         statements.add(new ExpStmt((IRExpr) imcCode.valueFor(forLoop.body).get()));
-        statements.add(new MoveStmt((IRExpr) imcCode.valueFor(forLoop.counter).get(), new BinopExpr((IRExpr) imcCode.valueFor(forLoop.counter).get(), (IRExpr) imcCode.valueFor(forLoop.step).get(), BinopExpr.Operator.ADD)));
+        statements.add(new MoveStmt((IRExpr) imcCode.valueFor(forLoop.counter).get(), new BinopExpr(new MemExpr((IRExpr) imcCode.valueFor(forLoop.counter).get()), (IRExpr) imcCode.valueFor(forLoop.step).get(), BinopExpr.Operator.ADD)));
         statements.add(new JumpStmt(label0.label));
         statements.add(label2);
 
@@ -142,28 +166,32 @@ public class IRCodeGenerator implements Visitor {
     public void visit(Name name) {
         definitions.valueFor(name).ifPresent(nameValue -> {
             accesses.valueFor(nameValue).ifPresent(accessValue -> {
-
                 if (accessValue instanceof Access.Global globalAccess)
-                    imcCode.store(new MemExpr(new NameExpr(globalAccess.label)), name);
+                    imcCode.store(new NameExpr(globalAccess.label), name);
 
                 if (accessValue instanceof Access.Parameter parameterAccess)
                     imcCode.store(new MemExpr(new BinopExpr(NameExpr.FP(), new ConstantExpr(parameterAccess.offset), BinopExpr.Operator.ADD)), name);
 
                 if (accessValue instanceof Access.Local localAccess) {
-                    System.out.println(localAccess.staticLevel);
                     if (currentFrame.staticLevel == localAccess.staticLevel)
                         imcCode.store(new MemExpr(new BinopExpr(NameExpr.FP(), new ConstantExpr(localAccess.offset), BinopExpr.Operator.ADD)), name);
 
                     else {
                         var diff = Math.abs(localAccess.staticLevel - currentFrame.staticLevel);
-                        var location = new MemExpr(NameExpr.FP());
+                        var location = NameExpr.FP();
+                        IRExpr newLocation = null;
 
-                        while (diff > 0) {
-                            location = new MemExpr(location);
-                            diff--;
+                        if (diff == 1)
+                            imcCode.store(new MemExpr(new BinopExpr(location, new ConstantExpr(localAccess.offset), BinopExpr.Operator.ADD)), name);
+
+                        else {
+                            while (diff > 0) {
+                                newLocation = new MemExpr(location);
+                                diff--;
+                            }
+
+                            imcCode.store(new MemExpr(new BinopExpr(newLocation, new ConstantExpr(localAccess.offset), BinopExpr.Operator.ADD)), name);
                         }
-
-                        imcCode.store(new MemExpr(new BinopExpr(location, new ConstantExpr(localAccess.offset), BinopExpr.Operator.ADD)), name);
                     }
                 }
             });
@@ -254,8 +282,8 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(Where where) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        where.defs.accept(this);
+        where.expr.accept(this);
     }
 
     @Override
@@ -270,7 +298,7 @@ public class IRCodeGenerator implements Visitor {
 
         imcCode.valueFor(funDef.body).ifPresent(bodyValue -> {
             if (bodyValue instanceof IRExpr irExpr)
-                chunks.add(new Chunk.CodeChunk(currentFrame, new ExpStmt(irExpr)));
+                chunks.add(new Chunk.CodeChunk(currentFrame, new MoveStmt(new MemExpr(NameExpr.FP()), irExpr)));
             else if (bodyValue instanceof IRStmt irStmt)
                 chunks.add(new Chunk.CodeChunk(currentFrame, irStmt));
         });
@@ -291,25 +319,17 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(Parameter parameter) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
     }
 
     @Override
     public void visit(Array array) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
     }
 
     @Override
     public void visit(Atom atom) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
     }
 
     @Override
     public void visit(TypeName name) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
     }
 }
