@@ -10,6 +10,7 @@ import static common.RequireNonNull.requireNonNull;
 import java.util.ArrayList;
 import java.util.HashSet;
 
+import common.Constants;
 import common.Report;
 import compiler.common.Visitor;
 import compiler.parser.ast.def.*;
@@ -51,6 +52,51 @@ public class TypeChecker implements Visitor {
                 argumentTypes.add(value);
             }, () -> Report.error(call.position, "Napacen tip v argumentu!"));
         });
+
+        if (Constants.Library.contains(call.name)) {
+            switch (call.name) {
+                case Constants.printStringLabel -> {
+                    if (argumentTypes.size() != 1) {
+                        Report.error(call.position, "Napacno stevilo argumentov!");
+                    }
+                    if (!argumentTypes.get(0).isStr()) {
+                        Report.error(call.position, "Napacen tip argumenta!");
+                    }
+                    types.store(new Type.Atom(Kind.STR), call);
+                    return;
+                }
+                case Constants.printLogLabel -> {
+                    if (argumentTypes.size() != 1) {
+                        Report.error(call.position, "Napacno stevilo argumentov!");
+                    }
+                    if (!argumentTypes.get(0).isLog()) {
+                        Report.error(call.position, "Napacen tip argumenta!");
+                    }
+                    types.store(new Type.Atom(Kind.LOG), call);
+                    return;
+                }
+                case Constants.randIntLabel -> {
+                    if (argumentTypes.size() != 2) {
+                        Report.error(call.position, "Napacno stevilo argumentov!");
+                    }
+                    if (!argumentTypes.get(0).isInt() || !argumentTypes.get(1).isInt()) {
+                        Report.error(call.position, "Napacen tip argumenta!");
+                    }
+                    types.store(new Type.Atom(Kind.INT), call);
+                    return;
+                }
+                default -> {
+                    if (argumentTypes.size() != 1) {
+                        Report.error(call.position, "Napacno stevilo argumentov!");
+                    }
+                    if (!argumentTypes.get(0).isInt()) {
+                        Report.error(call.position, "Napacen tip argumenta!");
+                    }
+                    types.store(new Type.Atom(Kind.INT), call);
+                    return;
+                }
+            }
+        }
 
         var def = definitions.valueFor(call);
         if (def.isPresent()) {
@@ -126,7 +172,7 @@ public class TypeChecker implements Visitor {
                     types.store(asArray.get().type, binary);
                     return;
                 } else
-                    Report.error(binary.position,"Napaka pri izrazu s tabelami!");
+                    Report.error(binary.position, "Napaka pri izrazu s tabelami!");
             } else if (binary.operator.equals(Binary.Operator.ASSIGN)) {
                 if (leftType.get().equals(rightType.get()) && ((rightType.get().isLog()) || rightType.get().isInt()
                         || rightType.get().isStr())) {
@@ -161,7 +207,7 @@ public class TypeChecker implements Visitor {
         var counterType = types.valueFor(forLoop.counter);
         counterType.ifPresentOrElse(value -> {
             if (!value.isInt())
-                Report.error(forLoop.counter.position,"Neveljaven tip števca v for zanki!");
+                Report.error(forLoop.counter.position, "Neveljaven tip števca v for zanki!");
         }, () -> Report.error(forLoop.counter.position, "Napaka v števcu zanke!"));
         var lowType = types.valueFor(forLoop.low);
         lowType.ifPresentOrElse(value -> {
@@ -177,7 +223,7 @@ public class TypeChecker implements Visitor {
         stepType.ifPresentOrElse(value -> {
             if (!value.isInt())
                 Report.error(forLoop.step.position, "Neveljaven tip inkrementa v for zanki!");
-        }, () -> Report.error(forLoop.step.position,"Napaka v inkrementu zanke!"));
+        }, () -> Report.error(forLoop.step.position, "Napaka v inkrementu zanke!"));
 
         types.store(new Type.Atom(Kind.VOID), forLoop);
     }

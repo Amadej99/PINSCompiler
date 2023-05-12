@@ -1,1 +1,9 @@
-fun f (y : integer) : integer = ({for y=10,20,30:696969}, y)
+fun f(x:integer):integer = (
+    g(3)
+) {
+    where
+        var y:integer;
+        fun g(z:integer):integer = (
+            { z = x }
+        )
+}
