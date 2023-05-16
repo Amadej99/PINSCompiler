@@ -116,7 +116,9 @@ public class IRCodeGenerator implements Visitor {
     }
 
     private void callLibrary(Call call) {
-        var args = call.arguments.stream().map(arg -> (IRExpr) imcCode.valueFor(arg).get()).toList();
+        List<IRExpr> args = new ArrayList<>();
+        args.add(new ConstantExpr(0));
+        args.addAll(call.arguments.stream().map(arg -> (IRExpr) imcCode.valueFor(arg).get()).toList());
         imcCode.store(new CallExpr(Frame.Label.named(call.name), args), call);
     }
 
@@ -183,7 +185,7 @@ public class IRCodeGenerator implements Visitor {
         statements.add(new JumpStmt(label0.label));
         statements.add(label2);
 
-        imcCode.store(new SeqStmt(statements), forLoop);
+        imcCode.store(new EseqExpr(new SeqStmt(statements), new ConstantExpr(0)), forLoop);
     }
 
     @Override
@@ -253,7 +255,7 @@ public class IRCodeGenerator implements Visitor {
                     statements.add(label3);
                 }
 
-                imcCode.store(new SeqStmt(statements), ifThenElse);
+                imcCode.store(new EseqExpr(new SeqStmt(statements), new ConstantExpr(0)), ifThenElse);
             });
         });
     }
@@ -292,7 +294,7 @@ public class IRCodeGenerator implements Visitor {
         whileLoop.condition.accept(this);
         whileLoop.body.accept(this);
 
-        var statements = new ArrayList<IRStmt>();
+        List<IRStmt> statements = new ArrayList<IRStmt>();
 
         var label0 = new LabelStmt(Label.nextAnonymous());
         var label1 = new LabelStmt(Label.nextAnonymous());
@@ -311,7 +313,7 @@ public class IRCodeGenerator implements Visitor {
         statements.add(new JumpStmt(label0.label));
         statements.add(label2);
 
-        imcCode.store(new SeqStmt(statements), whileLoop);
+        imcCode.store(new EseqExpr(new SeqStmt(statements), new ConstantExpr(0)), whileLoop);
     }
 
     @Override
