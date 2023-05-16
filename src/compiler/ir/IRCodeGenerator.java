@@ -78,12 +78,14 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(Call call) {
+        //Acceptam vse argumente
         call.arguments.forEach(arg -> arg.accept(this));
 
         if (Constants.Library.contains(call.name)) {
             callLibrary(call);
             return;
         }
+
 
         var currentLevel = currentFrame.staticLevel;
         var def = definitions.valueFor(call).get();
@@ -95,7 +97,7 @@ public class IRCodeGenerator implements Visitor {
 
             var diff = Math.abs(currentLevel - frame.staticLevel);
 
-            if(currentLevel == 1)
+            if (currentLevel == 1)
                 args.add(new ConstantExpr(0));
             else {
                 var framePointer = new MemExpr(NameExpr.FP());
@@ -114,7 +116,9 @@ public class IRCodeGenerator implements Visitor {
     }
 
     private void callLibrary(Call call) {
-        var args = call.arguments.stream().map(arg -> (IRExpr) imcCode.valueFor(arg).get()).toList();
+        List<IRExpr> args = new ArrayList<>();
+        args.add(new ConstantExpr(0));
+        args.addAll(call.arguments.stream().map(arg -> (IRExpr) imcCode.valueFor(arg).get()).toList());
         imcCode.store(new CallExpr(Frame.Label.named(call.name), args), call);
     }
 
@@ -128,14 +132,14 @@ public class IRCodeGenerator implements Visitor {
         if (binary.operator.equals(Binary.Operator.ASSIGN)) {
             imcCode.store(new EseqExpr(new MoveStmt((IRExpr) left, (IRExpr) right), (IRExpr) left), binary);
         } else if (binary.operator.equals(Binary.Operator.ARR)) {
-            //TODO: local arrays
             types.valueFor(binary).ifPresent(binaryValue -> {
-                var offset = new BinopExpr(new ConstantExpr(binaryValue.sizeInBytesAsParam()), (IRExpr) right, BinopExpr.Operator.MUL);
+                var offset = new BinopExpr(new ConstantExpr(binaryValue.sizeInBytes()), (IRExpr) right, BinopExpr.Operator.MUL);
 
-                if(left instanceof MemExpr memExpr) {
+                if (left instanceof MemExpr memExpr) {
                     var location = new BinopExpr(memExpr.expr, offset, BinopExpr.Operator.ADD);
                     imcCode.store(new MemExpr(location), binary);
                 }
+
             });
         } else {
             imcCode.store(new BinopExpr((IRExpr) left, (IRExpr) right, BinopExpr.Operator.valueOf(binary.operator.toString())), binary);
@@ -169,12 +173,19 @@ public class IRCodeGenerator implements Visitor {
         statements.add(label0);
         statements.add(new CJumpStmt(cond, label1.label, label2.label));
         statements.add(label1);
-        statements.add(new ExpStmt((IRExpr) imcCode.valueFor(forLoop.body).get()));
+
+        imcCode.valueFor(forLoop.body).ifPresent(body -> {
+            if (body instanceof IRStmt irStmt)
+                statements.add(irStmt);
+            else
+                statements.add(new ExpStmt((IRExpr) body));
+        });
+
         statements.add(new MoveStmt((IRExpr) imcCode.valueFor(forLoop.counter).get(), new BinopExpr((IRExpr) imcCode.valueFor(forLoop.counter).get(), (IRExpr) imcCode.valueFor(forLoop.step).get(), BinopExpr.Operator.ADD)));
         statements.add(new JumpStmt(label0.label));
         statements.add(label2);
 
-        imcCode.store(new SeqStmt(statements), forLoop);
+        imcCode.store(new EseqExpr(new SeqStmt(statements), new ConstantExpr(0)), forLoop);
     }
 
     @Override
@@ -182,7 +193,7 @@ public class IRCodeGenerator implements Visitor {
         definitions.valueFor(name).ifPresent(nameValue -> {
             accesses.valueFor(nameValue).ifPresent(accessValue -> {
                 if (accessValue instanceof Access.Global globalAccess)
-                    imcCode.store(new NameExpr(globalAccess.label), name);
+                    imcCode.store(new MemExpr(new NameExpr(globalAccess.label)), name);
 
                 if (accessValue instanceof Access.Parameter parameterAccess)
                     imcCode.store(new MemExpr(new BinopExpr(NameExpr.FP(), new ConstantExpr(parameterAccess.offset), BinopExpr.Operator.ADD)), name);
@@ -221,7 +232,7 @@ public class IRCodeGenerator implements Visitor {
 
         imcCode.valueFor(ifThenElse.condition).ifPresent(ifValue -> {
             imcCode.valueFor(ifThenElse.thenExpression).ifPresent(thenValue -> {
-                var thenExpr = new ExpStmt((IRExpr) thenValue);
+                var thenExpr = thenValue instanceof IRStmt irStmt ? irStmt : new ExpStmt((IRExpr) thenValue);
 
                 if (ifThenElse.elseExpression.isPresent()) {
                     statements.add(new CJumpStmt((IRExpr) ifValue, label1.label, label2.label));
@@ -229,7 +240,13 @@ public class IRCodeGenerator implements Visitor {
                     statements.add(thenExpr);
                     statements.add(new JumpStmt(label3.label));
                     statements.add(label2);
-                    statements.add(new ExpStmt((IRExpr) imcCode.valueFor(ifThenElse.elseExpression.get()).get()));
+                    imcCode.valueFor(ifThenElse.elseExpression.get()).ifPresent(elseValue -> {
+                        if (elseValue instanceof IRStmt irStmt)
+                            statements.add(irStmt);
+                        else
+                            statements.add(new ExpStmt((IRExpr) elseValue));
+                    });
+//                    statements.add(new ExpStmt((IRExpr) imcCode.valueFor(ifThenElse.elseExpression.get()).get()));
                     statements.add(label3);
                 } else {
                     statements.add(new CJumpStmt((IRExpr) ifValue, label1.label, label3.label));
@@ -238,7 +255,7 @@ public class IRCodeGenerator implements Visitor {
                     statements.add(label3);
                 }
 
-                imcCode.store(new SeqStmt(statements), ifThenElse);
+                imcCode.store(new EseqExpr(new SeqStmt(statements), new ConstantExpr(0)), ifThenElse);
             });
         });
     }
@@ -252,7 +269,7 @@ public class IRCodeGenerator implements Visitor {
                 imcCode.store(new ConstantExpr(literal.value.equals("true") ? 1 : 0), literal);
             else if (type.isStr()) {
                 Label label = Label.nextAnonymous();
-                var dataChunk = new Chunk.DataChunk(new Access.Global(Constants.WordSize, label),literal.value);
+                var dataChunk = new Chunk.DataChunk(new Access.Global(Constants.WordSize, label), literal.value);
                 chunks.add(dataChunk);
                 imcCode.store(new NameExpr(label), literal);
             }
@@ -277,7 +294,7 @@ public class IRCodeGenerator implements Visitor {
         whileLoop.condition.accept(this);
         whileLoop.body.accept(this);
 
-        var statements = new ArrayList<IRStmt>();
+        List<IRStmt> statements = new ArrayList<IRStmt>();
 
         var label0 = new LabelStmt(Label.nextAnonymous());
         var label1 = new LabelStmt(Label.nextAnonymous());
@@ -286,11 +303,17 @@ public class IRCodeGenerator implements Visitor {
         statements.add(label0);
         statements.add(new CJumpStmt((IRExpr) imcCode.valueFor(whileLoop.condition).get(), label1.label, label2.label));
         statements.add(label1);
-        statements.add(new ExpStmt((IRExpr) imcCode.valueFor(whileLoop.body).get()));
+        imcCode.valueFor(whileLoop.body).ifPresent(bodyValue -> {
+            if (bodyValue instanceof IRStmt irStmt)
+                statements.add(irStmt);
+            else
+                statements.add(new ExpStmt((IRExpr) bodyValue));
+        });
+//        statements.add(new ExpStmt((IRExpr) imcCode.valueFor(whileLoop.body).get()));
         statements.add(new JumpStmt(label0.label));
         statements.add(label2);
 
-        imcCode.store(new SeqStmt(statements), whileLoop);
+        imcCode.store(new EseqExpr(new SeqStmt(statements), new ConstantExpr(0)), whileLoop);
     }
 
     @Override
