@@ -33,7 +33,7 @@ public class Interpreter {
 
     /**
      * Izhodni tok, kamor izpisujemo rezultate izvajanja programa.
-     *
+     * <p>
      * V primeru, da rezultatov ne želimo izpisovati, nastavimo na `Optional.empty()`.
      */
     private Optional<PrintStream> outputStream;
@@ -52,6 +52,8 @@ public class Interpreter {
      * Klicni kazalec (kaže na vrh aktivnega klicnega zapisa).
      */
     private int framePointer;
+
+    private int oldFramePointer;
 
     public Interpreter(Memory memory, Optional<PrintStream> outputStream) {
         requireNonNull(memory, outputStream);
@@ -72,6 +74,10 @@ public class Interpreter {
     private void internalInterpret(CodeChunk chunk, Map<Frame.Temp, Object> temps) {
         // @TODO: Nastavi FP in SP na nove vrednosti!
 
+        oldFramePointer = framePointer;
+        framePointer = stackPointer;
+        stackPointer -= chunk.frame.size();
+
         Object result = null;
         if (chunk.code instanceof SeqStmt seq) {
             for (int pc = 0; pc < seq.statements.size(); pc++) {
@@ -90,7 +96,8 @@ public class Interpreter {
             throw new RuntimeException("Linearize IR!");
         }
 
-        // @TODO: Ponastavi FP in SP na stare vrednosti!
+        framePointer = oldFramePointer;
+        stackPointer += chunk.frame.size();
     }
 
     private Object execute(IRStmt stmt, Map<Frame.Temp, Object> temps) {
@@ -114,15 +121,23 @@ public class Interpreter {
     }
 
     private Object execute(ExpStmt exp, Map<Frame.Temp, Object> temps) {
-        throw new UnsupportedOperationException("Unimplemented method 'execute'");
+        return execute(exp.expr, temps);
     }
 
     private Object execute(JumpStmt jump, Map<Frame.Temp, Object> temps) {
-        throw new UnsupportedOperationException("Unimplemented method 'execute'");
+        
     }
 
     private Object execute(MoveStmt move, Map<Frame.Temp, Object> temps) {
-        throw new UnsupportedOperationException("Unimplemented method 'execute'");
+        if (move.dst instanceof TempExpr tempExpr){
+            temps.put(tempExpr.temp, execute(move.src, temps));
+            return null;
+        }
+        var destination = execute(move.dst, temps);
+        var source = execute(move.src, temps);
+
+        memory.stM(toInt(destination), source);
+        return null;
     }
 
     private Object execute(IRExpr expr, Map<Frame.Temp, Object> temps) {
@@ -146,33 +161,87 @@ public class Interpreter {
     }
 
     private Object execute(BinopExpr binop, Map<Frame.Temp, Object> temps) {
-        throw new UnsupportedOperationException("Unimplemented method 'execute'");
+        var left = execute(binop.lhs, temps);
+        var right = execute(binop.rhs, temps);
+
+        switch (binop.op) {
+            case ADD -> {
+                return toInt(left) + toInt(right);
+            }
+            case SUB -> {
+                return toInt(left) - toInt(right);
+            }
+            case MUL -> {
+                return toInt(left) * toInt(right);
+            }
+            case DIV -> {
+                return toInt(left) / toInt(right);
+            }
+            case AND -> {
+                return toBool(left) && toBool(right);
+            }
+            case OR -> {
+                return toBool(left) || toBool(right);
+            }
+            case EQ -> {
+                return toInt(left) == toInt(right);
+            }
+            case NEQ -> {
+                return toInt(left) != toInt(right);
+            }
+            case LT -> {
+                return toInt(left) < toInt(right);
+            }
+            case GT -> {
+                return toInt(left) > toInt(right);
+            }
+            case GEQ -> {
+                return toInt(left) >= toInt(right);
+            }
+            case LEQ -> {
+                return toInt(left) <= toInt(right);
+            }
+            case MOD -> {
+                return toInt(left) % toInt(right);
+            }
+        }
+        throw new RuntimeException("Unknown binop!");
     }
 
     private Object execute(CallExpr call, Map<Frame.Temp, Object> temps) {
         if (call.label.name.equals(Constants.printIntLabel)) {
-            if (call.args.size() != 2) { throw new RuntimeException("Invalid argument count!"); }
+            if (call.args.size() != 2) {
+                throw new RuntimeException("Invalid argument count!");
+            }
             var arg = execute(call.args.get(1), temps);
             outputStream.ifPresent(stream -> stream.println(arg));
             return null;
         } else if (call.label.name.equals(Constants.printStringLabel)) {
-            if (call.args.size() != 2) { throw new RuntimeException("Invalid argument count!"); }
+            if (call.args.size() != 2) {
+                throw new RuntimeException("Invalid argument count!");
+            }
             var address = execute(call.args.get(1), temps);
             var res = memory.ldM(toInt(address));
-            outputStream.ifPresent(stream -> stream.println("\""+res+"\""));
+            outputStream.ifPresent(stream -> stream.println("\"" + res + "\""));
             return null;
         } else if (call.label.name.equals(Constants.printLogLabel)) {
-            if (call.args.size() != 2) { throw new RuntimeException("Invalid argument count!"); }
+            if (call.args.size() != 2) {
+                throw new RuntimeException("Invalid argument count!");
+            }
             var arg = execute(call.args.get(1), temps);
             outputStream.ifPresent(stream -> stream.println(toBool(arg)));
             return null;
         } else if (call.label.name.equals(Constants.randIntLabel)) {
-            if (call.args.size() != 3) { throw new RuntimeException("Invalid argument count!"); }
+            if (call.args.size() != 3) {
+                throw new RuntimeException("Invalid argument count!");
+            }
             var min = toInt(execute(call.args.get(1), temps));
             var max = toInt(execute(call.args.get(2), temps));
             return random.nextInt(min, max);
         } else if (call.label.name.equals(Constants.seedLabel)) {
-            if (call.args.size() != 2) { throw new RuntimeException("Invalid argument count!"); }
+            if (call.args.size() != 2) {
+                throw new RuntimeException("Invalid argument count!");
+            }
             var seed = toInt(execute(call.args.get(1), temps));
             random = new Random(seed);
             return null;
@@ -188,19 +257,23 @@ public class Interpreter {
     }
 
     private Object execute(ConstantExpr constant) {
-        throw new UnsupportedOperationException("Unimplemented method 'execute'");
+        return constant.constant;
     }
 
     private Object execute(MemExpr mem, Map<Frame.Temp, Object> temps) {
-        throw new UnsupportedOperationException("Unimplemented method 'execute'");
+        return execute(mem.expr, temps);
     }
 
     private Object execute(NameExpr name) {
-        throw new UnsupportedOperationException("Unimplemented method 'execute'");
+        if(name.label.name.equals("{FP}"))
+            return framePointer;
+        if(name.label.name.equals("{SP}"))
+            return stackPointer;
+        return memory.address(name.label);
     }
 
     private Object execute(TempExpr temp, Map<Frame.Temp, Object> temps) {
-        throw new UnsupportedOperationException("Unimplemented method 'execute'");
+        return temps.get(temp.temp);
     }
 
     // ----------- pomožne funkcije -----------
