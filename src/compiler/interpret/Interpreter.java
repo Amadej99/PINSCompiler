@@ -10,6 +10,7 @@ import static common.RequireNonNull.requireNonNull;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
+import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -117,7 +118,14 @@ public class Interpreter {
     }
 
     private Object execute(CJumpStmt cjump, Map<Frame.Temp, Object> temps) {
-        throw new UnsupportedOperationException("Unimplemented method 'execute'");
+        var condition = execute(cjump.condition, temps);
+        if (condition instanceof Boolean cond){
+            if (cond)
+                return cjump.thenLabel;
+            else if(cjump.elseLabel != null)
+                return cjump.elseLabel;
+        }
+        return null;
     }
 
     private Object execute(ExpStmt exp, Map<Frame.Temp, Object> temps) {
@@ -125,7 +133,7 @@ public class Interpreter {
     }
 
     private Object execute(JumpStmt jump, Map<Frame.Temp, Object> temps) {
-        
+        return jump.label;
     }
 
     private Object execute(MoveStmt move, Map<Frame.Temp, Object> temps) {
@@ -133,6 +141,16 @@ public class Interpreter {
             temps.put(tempExpr.temp, execute(move.src, temps));
             return null;
         }
+
+        if(move.dst instanceof MemExpr memExpr){
+            var destination = execute(memExpr.expr, temps);
+            System.out.println("Destinacija: " + destination);
+            var source = execute(move.src, temps);
+
+            memory.stM(toInt(destination), source);
+            return null;
+        }
+
         var destination = execute(move.dst, temps);
         var source = execute(move.src, temps);
 
@@ -261,7 +279,8 @@ public class Interpreter {
     }
 
     private Object execute(MemExpr mem, Map<Frame.Temp, Object> temps) {
-        return execute(mem.expr, temps);
+        var address = execute(mem.expr, temps);
+        return memory.ldM(toInt(address));
     }
 
     private Object execute(NameExpr name) {

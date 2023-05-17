@@ -1,1 +1,8 @@
-fun main ( x : integer) : integer = print_int(1)
+fun main(argc : integer) : integer = (
+  print_int(argc),
+  {
+    if argc == 0 then print_int(1)
+    else print_int(2)
+  },
+  0
+)
