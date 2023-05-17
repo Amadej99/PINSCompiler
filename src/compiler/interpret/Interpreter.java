@@ -10,7 +10,6 @@ import static common.RequireNonNull.requireNonNull;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
-import java.sql.SQLOutput;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -67,14 +66,12 @@ public class Interpreter {
     // --------- izvajanje navideznega stroja ----------
 
     public void interpret(CodeChunk chunk) {
-        memory.stM(framePointer + Constants.WordSize, 999); // argument v funkcijo main
+        memory.stM(framePointer + Constants.WordSize, 0); // argument v funkcijo main
         memory.stM(framePointer - chunk.frame.oldFPOffset(), framePointer); // oldFP
         internalInterpret(chunk, new HashMap<>());
     }
 
     private void internalInterpret(CodeChunk chunk, Map<Frame.Temp, Object> temps) {
-        // @TODO: Nastavi FP in SP na nove vrednosti!
-
         oldFramePointer = framePointer;
         framePointer = stackPointer;
         stackPointer -= chunk.frame.size();
@@ -144,7 +141,6 @@ public class Interpreter {
 
         if(move.dst instanceof MemExpr memExpr){
             var destination = execute(memExpr.expr, temps);
-            System.out.println("Destinacija: " + destination);
             var source = execute(move.src, temps);
 
             memory.stM(toInt(destination), source);
@@ -264,11 +260,15 @@ public class Interpreter {
             random = new Random(seed);
             return null;
         } else if (memory.ldM(call.label) instanceof CodeChunk chunk) {
-            // ...
-            // internalInterpret(chunk, new HashMap<>())
-            //                          ~~~~~~~~~~~~~ 'lokalni registri'
-            // ...
-            throw new UnsupportedOperationException("Unimplemented method 'execute'");
+            int offset = 0;
+            for (var arg : call.args) {
+                var value = execute(arg, temps);
+                memory.stM(stackPointer + offset, value);
+                offset += 4;
+            }
+
+            internalInterpret(chunk, new HashMap<>());
+            return memory.ldM(framePointer - 4);
         } else {
             throw new RuntimeException("Only functions can be called!");
         }

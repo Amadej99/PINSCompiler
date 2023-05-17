@@ -97,7 +97,7 @@ public class IRCodeGenerator implements Visitor {
 
             var diff = Math.abs(currentLevel - frame.staticLevel);
 
-            if (currentLevel == 1)
+            if (frame.staticLevel == 1)
                 args.add(new ConstantExpr(0));
             else {
                 var framePointer = new MemExpr(NameExpr.FP());
