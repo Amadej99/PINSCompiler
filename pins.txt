@@ -1,9 +1,1 @@
-fun f(x:integer):integer = (
-    g(3)
-) {
-    where
-        var y:integer;
-        fun g(z:integer):integer = (
-            { z = x }
-        )
-}
+fun main ( x : integer) : integer = print_int(1)
