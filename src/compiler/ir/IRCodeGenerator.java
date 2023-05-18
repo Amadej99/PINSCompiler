@@ -86,22 +86,23 @@ public class IRCodeGenerator implements Visitor {
             return;
         }
 
-
         var currentLevel = currentFrame.staticLevel;
         var def = definitions.valueFor(call).get();
 
         frames.valueFor(def).ifPresent(frame -> {
-            var binopOld = new BinopExpr(NameExpr.SP(), new ConstantExpr(currentFrame.oldFPOffset()), BinopExpr.Operator.SUB);
+            var binopOld = new BinopExpr(NameExpr.SP(), new ConstantExpr(frame.oldFPOffset()), BinopExpr.Operator.SUB);
             var saveFP = new MoveStmt(new MemExpr(binopOld), NameExpr.FP());
             List<IRExpr> args = new ArrayList<>();
 
-            var diff = Math.abs(currentLevel - frame.staticLevel);
+            var diff = currentLevel - frame.staticLevel;
 
             if (frame.staticLevel == 1)
                 args.add(new ConstantExpr(0));
-            else {
-                var framePointer = new MemExpr(NameExpr.FP());
-                diff--;
+            else if (diff == -1) {
+                args.add(NameExpr.FP());
+            } else {
+                IRExpr framePointer = new MemExpr(NameExpr.FP());
+//                diff--;
 
                 for (int i = 0; i < diff; i++) {
                     framePointer = new MemExpr(framePointer);
@@ -136,9 +137,23 @@ public class IRCodeGenerator implements Visitor {
                 var offset = new BinopExpr(new ConstantExpr(binaryValue.sizeInBytes()), (IRExpr) right, BinopExpr.Operator.MUL);
 
                 if (left instanceof MemExpr memExpr) {
-                    var location = new BinopExpr(memExpr.expr, offset, BinopExpr.Operator.ADD);
-                    imcCode.store(new MemExpr(location), binary);
+                    accesses.valueFor(binary.left).ifPresentOrElse(access -> {
+                        if (access instanceof Access.Parameter) {
+                            var location = new BinopExpr(memExpr, offset, BinopExpr.Operator.ADD);
+                            imcCode.store(new MemExpr(location), binary);
+                        } else {
+                            var location = new BinopExpr(memExpr.expr, offset, BinopExpr.Operator.ADD);
+                            imcCode.store(new MemExpr(location), binary);
+                        }
+                    }, () -> {
+                        var location = new BinopExpr(memExpr.expr, offset, BinopExpr.Operator.ADD);
+                        imcCode.store(new MemExpr(location), binary);
+                    });
                 }
+//                else {
+//                        var location = new BinopExpr(memExpr.expr, offset, BinopExpr.Operator.ADD);
+//                        imcCode.store(new MemExpr(location), binary);
+//                    }
 
             });
         } else {
@@ -195,8 +210,9 @@ public class IRCodeGenerator implements Visitor {
                 if (accessValue instanceof Access.Global globalAccess)
                     imcCode.store(new MemExpr(new NameExpr(globalAccess.label)), name);
 
-                if (accessValue instanceof Access.Parameter parameterAccess)
+                if (accessValue instanceof Access.Parameter parameterAccess) {
                     imcCode.store(new MemExpr(new BinopExpr(NameExpr.FP(), new ConstantExpr(parameterAccess.offset), BinopExpr.Operator.ADD)), name);
+                }
 
                 if (accessValue instanceof Access.Local localAccess) {
                     if (currentFrame.staticLevel == localAccess.staticLevel)
@@ -284,8 +300,9 @@ public class IRCodeGenerator implements Visitor {
                 imcCode.store(new BinopExpr(new ConstantExpr(0), (IRExpr) unaryValue, BinopExpr.Operator.ADD), unary);
             else if (unary.operator.equals(Unary.Operator.SUB))
                 imcCode.store(new BinopExpr(new ConstantExpr(0), (IRExpr) unaryValue, BinopExpr.Operator.SUB), unary);
-            else if (unary.operator.equals(Unary.Operator.NOT))
+            else if (unary.operator.equals(Unary.Operator.NOT)) {
                 imcCode.store(new ConstantExpr(1 - ((ConstantExpr) unaryValue).constant), unary);
+            }
         });
     }
 

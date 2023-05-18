@@ -1,8 +1,1 @@
-fun main(argc : integer) : integer = (
-  print_int(argc),
-  {
-    if argc == 0 then print_int(1)
-    else print_int(2)
-  },
-  0
-)
+fun main( x : integer ) : integer = print_int(y) { where fun g ( c : integer) : integer = y; var y : integer }

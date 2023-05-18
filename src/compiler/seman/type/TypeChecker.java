@@ -232,8 +232,11 @@ public class TypeChecker implements Visitor {
     public void visit(Name name) {
         var def = definitions.valueFor(name);
         def.ifPresent(value -> {
+            value.accept(this);
             var type = types.valueFor(value);
-            type.ifPresent(value2 -> types.store(value2, name));
+            type.ifPresentOrElse(value2 -> types.store(value2, name), () -> {
+                Report.error(name.position, "Napaka v imenu!");
+            });
         });
     }
 

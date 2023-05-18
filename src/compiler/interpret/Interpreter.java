@@ -34,7 +34,8 @@ public class Interpreter {
     /**
      * Izhodni tok, kamor izpisujemo rezultate izvajanja programa.
      * <p>
-     * V primeru, da rezultatov ne želimo izpisovati, nastavimo na `Optional.empty()`.
+     * V primeru, da rezultatov ne želimo izpisovati, nastavimo na
+     * `Optional.empty()`.
      */
     private Optional<PrintStream> outputStream;
 
@@ -53,8 +54,6 @@ public class Interpreter {
      */
     private int framePointer;
 
-    private int oldFramePointer;
-
     public Interpreter(Memory memory, Optional<PrintStream> outputStream) {
         requireNonNull(memory, outputStream);
         this.memory = memory;
@@ -72,7 +71,6 @@ public class Interpreter {
     }
 
     private void internalInterpret(CodeChunk chunk, Map<Frame.Temp, Object> temps) {
-        oldFramePointer = framePointer;
         framePointer = stackPointer;
         stackPointer -= chunk.frame.size();
 
@@ -94,8 +92,10 @@ public class Interpreter {
             throw new RuntimeException("Linearize IR!");
         }
 
-        framePointer = oldFramePointer;
-        stackPointer += chunk.frame.size();
+        stackPointer = framePointer;
+//        System.out.println(framePointer - chunk.frame.oldFPOffset());
+        framePointer = toInt(memory.ldM(framePointer - chunk.frame.oldFPOffset()));
+//        System.out.printf("Frame: %d, Stack: %d\n", framePointer, stackPointer);
     }
 
     private Object execute(IRStmt stmt, Map<Frame.Temp, Object> temps) {
@@ -115,13 +115,11 @@ public class Interpreter {
     }
 
     private Object execute(CJumpStmt cjump, Map<Frame.Temp, Object> temps) {
-        var condition = execute(cjump.condition, temps);
-        if (condition instanceof Boolean cond){
-            if (cond)
-                return cjump.thenLabel;
-            else if(cjump.elseLabel != null)
-                return cjump.elseLabel;
-        }
+        var condition = toBool(execute(cjump.condition, temps));
+        if (condition)
+            return cjump.thenLabel;
+        else if (cjump.elseLabel != null)
+            return cjump.elseLabel;
         return null;
     }
 
@@ -134,23 +132,18 @@ public class Interpreter {
     }
 
     private Object execute(MoveStmt move, Map<Frame.Temp, Object> temps) {
-        if (move.dst instanceof TempExpr tempExpr){
+        if (move.dst instanceof TempExpr tempExpr) {
             temps.put(tempExpr.temp, execute(move.src, temps));
             return null;
         }
 
-        if(move.dst instanceof MemExpr memExpr){
+        if (move.dst instanceof MemExpr memExpr) {
             var destination = execute(memExpr.expr, temps);
             var source = execute(move.src, temps);
 
             memory.stM(toInt(destination), source);
             return null;
         }
-
-        var destination = execute(move.dst, temps);
-        var source = execute(move.src, temps);
-
-        memory.stM(toInt(destination), source);
         return null;
     }
 
@@ -192,28 +185,28 @@ public class Interpreter {
                 return toInt(left) / toInt(right);
             }
             case AND -> {
-                return toBool(left) && toBool(right);
+                return toInt(toBool(left) && toBool(right));
             }
             case OR -> {
-                return toBool(left) || toBool(right);
+                return toInt(toBool(left) || toBool(right));
             }
             case EQ -> {
-                return toInt(left) == toInt(right);
+                return toInt(toInt(left) == toInt(right));
             }
             case NEQ -> {
-                return toInt(left) != toInt(right);
+                return toInt(toInt(left) != toInt(right));
             }
             case LT -> {
-                return toInt(left) < toInt(right);
+                return toInt(toInt(left) < toInt(right));
             }
             case GT -> {
-                return toInt(left) > toInt(right);
+                return toInt(toInt(left) > toInt(right));
             }
             case GEQ -> {
-                return toInt(left) >= toInt(right);
+                return toInt(toInt(left) >= toInt(right));
             }
             case LEQ -> {
-                return toInt(left) <= toInt(right);
+                return toInt(toInt(left) <= toInt(right));
             }
             case MOD -> {
                 return toInt(left) % toInt(right);
@@ -268,7 +261,8 @@ public class Interpreter {
             }
 
             internalInterpret(chunk, new HashMap<>());
-            return memory.ldM(framePointer - 4);
+            var result = memory.ldM(stackPointer);
+            return result;
         } else {
             throw new RuntimeException("Only functions can be called!");
         }
@@ -284,9 +278,9 @@ public class Interpreter {
     }
 
     private Object execute(NameExpr name) {
-        if(name.label.name.equals("{FP}"))
+        if (name.label.name.equals("{FP}"))
             return framePointer;
-        if(name.label.name.equals("{SP}"))
+        if (name.label.name.equals("{SP}"))
             return stackPointer;
         return memory.address(name.label);
     }
