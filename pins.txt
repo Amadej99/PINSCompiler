@@ -1,1 +1,12 @@
-fun main( x : integer ) : integer = print_int(y) { where fun g ( c : integer) : integer = y; var y : integer }
+fun nested_functions_print(n : integer) : integer = print_variable(0)
+{ where
+    fun print_variable(x : integer) : integer = print_variable2(0)
+    { where
+        fun print_variable2(y : integer) : integer = print_int(n)
+    }
+};
+
+fun main(argc : integer) : integer = (
+    { n = 8 },
+    nested_functions_print(n)
+) { where var n : integer }

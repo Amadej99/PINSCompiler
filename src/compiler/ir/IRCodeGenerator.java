@@ -94,18 +94,19 @@ public class IRCodeGenerator implements Visitor {
             var saveFP = new MoveStmt(new MemExpr(binopOld), NameExpr.FP());
             List<IRExpr> args = new ArrayList<>();
 
-            var diff = currentLevel - frame.staticLevel;
-
             if (frame.staticLevel == 1)
                 args.add(new ConstantExpr(0));
-            else if (diff == -1) {
-                args.add(NameExpr.FP());
-            } else {
-                IRExpr framePointer = new MemExpr(NameExpr.FP());
-//                diff--;
 
-                for (int i = 0; i < diff; i++) {
+            else if (currentLevel == frame.staticLevel || currentLevel - frame.staticLevel == -1)
+                args.add(NameExpr.FP());
+
+            else {
+                var framePointer = new MemExpr(NameExpr.FP());
+                var diff = Math.abs(frame.staticLevel - currentLevel);
+//                diff--;
+                while (diff > 0) {
                     framePointer = new MemExpr(framePointer);
+                    diff--;
                 }
                 args.add(framePointer);
             }
@@ -134,7 +135,7 @@ public class IRCodeGenerator implements Visitor {
             imcCode.store(new EseqExpr(new MoveStmt((IRExpr) left, (IRExpr) right), (IRExpr) left), binary);
         } else if (binary.operator.equals(Binary.Operator.ARR)) {
             types.valueFor(binary).ifPresent(binaryValue -> {
-                var offset = new BinopExpr(new ConstantExpr(binaryValue.sizeInBytes()), (IRExpr) right, BinopExpr.Operator.MUL);
+                var offset = new BinopExpr(new ConstantExpr(binaryValue.sizeInBytesAsParam()), (IRExpr) right, BinopExpr.Operator.MUL);
 
                 if (left instanceof MemExpr memExpr) {
                     accesses.valueFor(binary.left).ifPresentOrElse(access -> {
@@ -211,7 +212,20 @@ public class IRCodeGenerator implements Visitor {
                     imcCode.store(new MemExpr(new NameExpr(globalAccess.label)), name);
 
                 if (accessValue instanceof Access.Parameter parameterAccess) {
-                    imcCode.store(new MemExpr(new BinopExpr(NameExpr.FP(), new ConstantExpr(parameterAccess.offset), BinopExpr.Operator.ADD)), name);
+                    if (currentFrame.staticLevel == parameterAccess.staticLevel)
+                        imcCode.store(new MemExpr(new BinopExpr(NameExpr.FP(), new ConstantExpr(parameterAccess.offset), BinopExpr.Operator.ADD)), name);
+                    else {
+                        var diff = Math.abs(parameterAccess.staticLevel - currentFrame.staticLevel);
+                        var location = new MemExpr(NameExpr.FP());
+                        diff--;
+
+                        while (diff > 0) {
+                            location = new MemExpr(location);
+                            diff--;
+                        }
+
+                        imcCode.store(new MemExpr(new BinopExpr(location, new ConstantExpr(parameterAccess.offset), BinopExpr.Operator.ADD)), name);
+                    }
                 }
 
                 if (accessValue instanceof Access.Local localAccess) {
@@ -301,7 +315,7 @@ public class IRCodeGenerator implements Visitor {
             else if (unary.operator.equals(Unary.Operator.SUB))
                 imcCode.store(new BinopExpr(new ConstantExpr(0), (IRExpr) unaryValue, BinopExpr.Operator.SUB), unary);
             else if (unary.operator.equals(Unary.Operator.NOT)) {
-                imcCode.store(new ConstantExpr(1 - ((ConstantExpr) unaryValue).constant), unary);
+                imcCode.store(new BinopExpr(new ConstantExpr(1), (IRExpr) unaryValue, BinopExpr.Operator.SUB), unary);
             }
         });
     }
