@@ -129,7 +129,7 @@ public class IRCodeGenerator implements Visitor {
             imcCode.store(new EseqExpr(new MoveStmt((IRExpr) left, (IRExpr) right), (IRExpr) left), binary);
         } else if (binary.operator.equals(Binary.Operator.ARR)) {
             types.valueFor(binary).ifPresent(binaryValue -> {
-                var offset = new BinopExpr((IRExpr) right, new ConstantExpr(binaryValue.sizeInBytesAsParam()), BinopExpr.Operator.MUL);
+                var offset = new BinopExpr((IRExpr) right, new ConstantExpr(binaryValue.sizeInBytes()), BinopExpr.Operator.MUL);
 
                 var location = new BinopExpr((IRExpr) left, offset, BinopExpr.Operator.ADD);
                 var type = types.valueFor(binary).get();
