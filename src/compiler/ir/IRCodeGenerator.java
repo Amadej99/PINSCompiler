@@ -97,18 +97,12 @@ public class IRCodeGenerator implements Visitor {
             if (frame.staticLevel == 1)
                 args.add(new ConstantExpr(0));
 
-            else if (currentLevel == frame.staticLevel || currentLevel - frame.staticLevel == -1)
+            else if (currentLevel - frame.staticLevel == -1)
                 args.add(NameExpr.FP());
 
             else {
-                var framePointer = new MemExpr(NameExpr.FP());
-                var diff = Math.abs(frame.staticLevel - currentLevel);
-//                diff--;
-                while (diff > 0) {
-                    framePointer = new MemExpr(framePointer);
-                    diff--;
-                }
-                args.add(framePointer);
+                var location = calculateStaticLink(currentLevel, frame.staticLevel);
+                args.add(location);
             }
 
             call.arguments.forEach(arg -> args.add((IRExpr) imcCode.valueFor(arg).get()));
@@ -135,27 +129,14 @@ public class IRCodeGenerator implements Visitor {
             imcCode.store(new EseqExpr(new MoveStmt((IRExpr) left, (IRExpr) right), (IRExpr) left), binary);
         } else if (binary.operator.equals(Binary.Operator.ARR)) {
             types.valueFor(binary).ifPresent(binaryValue -> {
-                var offset = new BinopExpr(new ConstantExpr(binaryValue.sizeInBytesAsParam()), (IRExpr) right, BinopExpr.Operator.MUL);
+                var offset = new BinopExpr((IRExpr) right, new ConstantExpr(binaryValue.sizeInBytesAsParam()), BinopExpr.Operator.MUL);
 
-                if (left instanceof MemExpr memExpr) {
-                    accesses.valueFor(binary.left).ifPresentOrElse(access -> {
-                        if (access instanceof Access.Parameter) {
-                            var location = new BinopExpr(memExpr, offset, BinopExpr.Operator.ADD);
-                            imcCode.store(new MemExpr(location), binary);
-                        } else {
-                            var location = new BinopExpr(memExpr.expr, offset, BinopExpr.Operator.ADD);
-                            imcCode.store(new MemExpr(location), binary);
-                        }
-                    }, () -> {
-                        var location = new BinopExpr(memExpr.expr, offset, BinopExpr.Operator.ADD);
-                        imcCode.store(new MemExpr(location), binary);
-                    });
-                }
-//                else {
-//                        var location = new BinopExpr(memExpr.expr, offset, BinopExpr.Operator.ADD);
-//                        imcCode.store(new MemExpr(location), binary);
-//                    }
-
+                var location = new BinopExpr((IRExpr) left, offset, BinopExpr.Operator.ADD);
+                var type = types.valueFor(binary).get();
+                if (type.isArray()) {
+                    imcCode.store(location, binary);
+                } else
+                    imcCode.store(new MemExpr(location), binary);
             });
         } else {
             imcCode.store(new BinopExpr((IRExpr) left, (IRExpr) right, BinopExpr.Operator.valueOf(binary.operator.toString())), binary);
@@ -208,40 +189,41 @@ public class IRCodeGenerator implements Visitor {
     public void visit(Name name) {
         definitions.valueFor(name).ifPresent(nameValue -> {
             accesses.valueFor(nameValue).ifPresent(accessValue -> {
-                if (accessValue instanceof Access.Global globalAccess)
-                    imcCode.store(new MemExpr(new NameExpr(globalAccess.label)), name);
+                if (accessValue instanceof Access.Global globalAccess) {
+                    var type = types.valueFor(nameValue).get();
+                    if (type.isArray())
+                        imcCode.store(new NameExpr(globalAccess.label), name);
+                    else
+                        imcCode.store(new MemExpr(new NameExpr(globalAccess.label)), name);
+                }
 
                 if (accessValue instanceof Access.Parameter parameterAccess) {
                     if (currentFrame.staticLevel == parameterAccess.staticLevel)
                         imcCode.store(new MemExpr(new BinopExpr(NameExpr.FP(), new ConstantExpr(parameterAccess.offset), BinopExpr.Operator.ADD)), name);
                     else {
-                        var diff = Math.abs(parameterAccess.staticLevel - currentFrame.staticLevel);
-                        var location = new MemExpr(NameExpr.FP());
-                        diff--;
-
-                        while (diff > 0) {
-                            location = new MemExpr(location);
-                            diff--;
-                        }
-
+                        var location = calculateStaticLink(parameterAccess.staticLevel, currentFrame.staticLevel);
                         imcCode.store(new MemExpr(new BinopExpr(location, new ConstantExpr(parameterAccess.offset), BinopExpr.Operator.ADD)), name);
                     }
                 }
 
                 if (accessValue instanceof Access.Local localAccess) {
-                    if (currentFrame.staticLevel == localAccess.staticLevel)
-                        imcCode.store(new MemExpr(new BinopExpr(NameExpr.FP(), new ConstantExpr(localAccess.offset), BinopExpr.Operator.ADD)), name);
-                    else {
-                        var diff = Math.abs(localAccess.staticLevel - currentFrame.staticLevel);
-                        var location = new MemExpr(NameExpr.FP());
-                        diff--;
+                    BinopExpr binop;
+                    if (currentFrame.staticLevel == localAccess.staticLevel) {
+                        binop = new BinopExpr(NameExpr.FP(), new ConstantExpr(localAccess.offset), BinopExpr.Operator.ADD);
+                        var type = types.valueFor(nameValue).get();
+                        if (type.isArray())
+                            imcCode.store(binop, name);
+                        else
+                            imcCode.store(new MemExpr(binop), name);
+                    } else {
+                        var location = calculateStaticLink(localAccess.staticLevel, currentFrame.staticLevel);
+                        binop = new BinopExpr(location, new ConstantExpr(localAccess.offset), BinopExpr.Operator.ADD);
 
-                        while (diff > 0) {
-                            location = new MemExpr(location);
-                            diff--;
-                        }
-
-                        imcCode.store(new MemExpr(new BinopExpr(location, new ConstantExpr(localAccess.offset), BinopExpr.Operator.ADD)), name);
+                        var type = types.valueFor(nameValue).get();
+                        if (type.isArray())
+                            imcCode.store(binop, name);
+                        else
+                            imcCode.store(new MemExpr(binop), name);
                     }
                 }
             });
@@ -276,7 +258,6 @@ public class IRCodeGenerator implements Visitor {
                         else
                             statements.add(new ExpStmt((IRExpr) elseValue));
                     });
-//                    statements.add(new ExpStmt((IRExpr) imcCode.valueFor(ifThenElse.elseExpression.get()).get()));
                     statements.add(label3);
                 } else {
                     statements.add(new CJumpStmt((IRExpr) ifValue, label1.label, label3.label));
@@ -340,7 +321,7 @@ public class IRCodeGenerator implements Visitor {
             else
                 statements.add(new ExpStmt((IRExpr) bodyValue));
         });
-//        statements.add(new ExpStmt((IRExpr) imcCode.valueFor(whileLoop.body).get()));
+
         statements.add(new JumpStmt(label0.label));
         statements.add(label2);
 
@@ -404,5 +385,18 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(TypeName name) {
+    }
+
+    private MemExpr calculateStaticLink(int targetLevel, int frameLevel) {
+        var diff = Math.abs(targetLevel - frameLevel);
+        var location = new MemExpr(NameExpr.FP());
+        diff--;
+
+        while (diff > 0) {
+            location = new MemExpr(location);
+            diff--;
+        }
+
+        return location;
     }
 }

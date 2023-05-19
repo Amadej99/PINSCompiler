@@ -10,7 +10,6 @@ import static common.RequireNonNull.requireNonNull;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -93,9 +92,7 @@ public class Interpreter {
         }
 
         stackPointer = framePointer;
-//        System.out.println(framePointer - chunk.frame.oldFPOffset());
         framePointer = toInt(memory.ldM(framePointer - chunk.frame.oldFPOffset()));
-//        System.out.printf("Frame: %d, Stack: %d\n", framePointer, stackPointer);
     }
 
     private Object execute(IRStmt stmt, Map<Frame.Temp, Object> temps) {
