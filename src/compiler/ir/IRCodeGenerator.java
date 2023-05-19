@@ -101,8 +101,14 @@ public class IRCodeGenerator implements Visitor {
                 args.add(NameExpr.FP());
 
             else {
-                var location = calculateStaticLink(currentLevel, frame.staticLevel);
-                args.add(location);
+                var diff = Math.abs(currentLevel - frame.staticLevel);
+                var FP = new MemExpr(NameExpr.FP());
+
+                while (diff > 0) {
+                    FP = new MemExpr(FP);
+                    diff--;
+                }
+                args.add(FP);
             }
 
             call.arguments.forEach(arg -> args.add((IRExpr) imcCode.valueFor(arg).get()));
@@ -201,8 +207,18 @@ public class IRCodeGenerator implements Visitor {
                     if (currentFrame.staticLevel == parameterAccess.staticLevel)
                         imcCode.store(new MemExpr(new BinopExpr(NameExpr.FP(), new ConstantExpr(parameterAccess.offset), BinopExpr.Operator.ADD)), name);
                     else {
-                        var location = calculateStaticLink(parameterAccess.staticLevel, currentFrame.staticLevel);
-                        imcCode.store(new MemExpr(new BinopExpr(location, new ConstantExpr(parameterAccess.offset), BinopExpr.Operator.ADD)), name);
+                        var staticLevelDiff = Math.abs(parameterAccess.staticLevel - this.currentFrame.staticLevel);
+                        var location = new MemExpr(NameExpr.FP());
+                        staticLevelDiff--;
+
+                        while (staticLevelDiff != 0) {
+                            location = new MemExpr(location);
+                            staticLevelDiff--;
+                        }
+
+                        var offset = new BinopExpr(location, new ConstantExpr(parameterAccess.offset), BinopExpr.Operator.ADD);
+                        var memExpr = new MemExpr(offset);
+                        imcCode.store(memExpr, name);
                     }
                 }
 
