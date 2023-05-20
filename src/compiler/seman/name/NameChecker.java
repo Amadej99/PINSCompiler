@@ -43,17 +43,20 @@ public class NameChecker implements Visitor {
 
     @Override
     public void visit(Call call) {
-        var def = symbolTable.definitionFor(call.name);
-        def.ifPresentOrElse(value -> {
+        // Preveri ali je funkcija definirana
+        symbolTable.definitionFor(call.name).ifPresentOrElse(value -> {
+            // Ce je definirana, preveri ali je funkcija
             if (!(value instanceof FunDef))
                 Report.error(call.name + " ni funkcija!");
             definitions.store(value, call);
         }, () -> {
+            // Ce ni definirana, preveri ali je v knjiznici
             if (Constants.Library.contains(call.name))
                 call.arguments.forEach(argument -> argument.accept(this));
             else
                 Report.error(call.name + " ni definirana funkcija!");
         });
+        // Acceptaj argumente
         call.arguments.forEach(argument -> argument.accept(this));
     }
 
@@ -79,16 +82,16 @@ public class NameChecker implements Visitor {
 
     @Override
     public void visit(Name name) {
-        var def = symbolTable.definitionFor(name.name);
-        def.ifPresentOrElse(value -> {
-                    if (value instanceof FunDef)
-                        Report.error(name.position + " " + name.name + " je funkcija, ne spremenljivka!");
-                    else if (value instanceof TypeDef)
-                        Report.error(name.position + " " + name.name + " je tip, ne spremenljivka!");
-                    else
-                        definitions.store(value, name);
-                },
-                () -> Report.error(name.position + " Nedefinirana spremenljivka " + name.name));
+        // Preveri ali je ime definirano
+        symbolTable.definitionFor(name.name).ifPresentOrElse(value -> {
+            // Ce je definirano, preveri ali je spremenljivka
+            if (value instanceof FunDef)
+                Report.error(name.position + " " + name.name + " je funkcija, ne spremenljivka!");
+            else if (value instanceof TypeDef)
+                Report.error(name.position + " " + name.name + " je tip, ne spremenljivka!");
+            else
+                definitions.store(value, name);
+        }, () -> Report.error(name.position + " Nedefinirana spremenljivka " + name.name));
     }
 
     @Override
@@ -127,6 +130,7 @@ public class NameChecker implements Visitor {
             try {
                 symbolTable.insert(def);
             } catch (DefinitionAlreadyExistsException e) {
+                // Ce definicija ze obstaja v simbolni tabeli, javi napako
                 Report.error("Definition already exists! " + def.name + def.position);
             }
         });
@@ -136,8 +140,10 @@ public class NameChecker implements Visitor {
 
     @Override
     public void visit(FunDef funDef) {
+        // Sprejmi tip funkcije in tip parametrov
         funDef.type.accept(this);
         funDef.parameters.forEach(parameter -> parameter.type.accept(this));
+        // Sprejmi telo funkcije in parametre v novem scope-u
         symbolTable.inNewScope(() -> {
             funDef.parameters.forEach(parameter -> parameter.accept(this));
             funDef.body.accept(this);
@@ -156,6 +162,7 @@ public class NameChecker implements Visitor {
 
     @Override
     public void visit(Parameter parameter) {
+        // Preveri ali je parameter ze definiran
         try {
             symbolTable.insert(parameter);
         } catch (DefinitionAlreadyExistsException e) {
@@ -174,17 +181,18 @@ public class NameChecker implements Visitor {
 
     @Override
     public void visit(TypeName name) {
-        var def = symbolTable.definitionFor(name.identifier);
-        def.ifPresentOrElse(value -> {
-                    if (value instanceof VarDef) {
-                        Report.error(name.position + " " + name.identifier + " je spremenljvka, ne tip!");
-                    } else if (value instanceof FunDef) {
-                        Report.error(name.position + " " + name.identifier + " je funkcija, ne tip!");
-                    } else if (value instanceof Parameter) {
-                        Report.error(name.position + " " + name.identifier + " je parameter, ne tip!");
-                    } else
-                        definitions.store(value, name);
-                },
+        // Preveri ali je tip definiran
+        symbolTable.definitionFor(name.identifier).ifPresentOrElse(value -> {
+            // Ce je definiran, preveri ali je tip
+            if (value instanceof VarDef) {
+                Report.error(name.position + " " + name.identifier + " je spremenljvka, ne tip!");
+            } else if (value instanceof FunDef) {
+                Report.error(name.position + " " + name.identifier + " je funkcija, ne tip!");
+            } else if (value instanceof Parameter) {
+                Report.error(name.position + " " + name.identifier + " je parameter, ne tip!");
+            } else
+                definitions.store(value, name);
+        },
                 () -> Report.error(name.position + " Nedefiniran tip " + name.identifier));
     }
 }
