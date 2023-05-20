@@ -10,6 +10,7 @@ import static common.RequireNonNull.requireNonNull;
 import java.util.ArrayList;
 import java.util.HashSet;
 
+import common.Constants;
 import common.Report;
 import compiler.common.Visitor;
 import compiler.parser.ast.def.*;
@@ -49,8 +50,53 @@ public class TypeChecker implements Visitor {
             var findType = types.valueFor(argument);
             findType.ifPresentOrElse(value -> {
                 argumentTypes.add(value);
-            }, () -> Report.error("Napacen tip v argumentu!"));
+            }, () -> Report.error(call.position, "Napacen tip v argumentu!"));
         });
+
+        if (Constants.Library.contains(call.name)) {
+            switch (call.name) {
+                case Constants.printStringLabel -> {
+                    if (argumentTypes.size() != 1) {
+                        Report.error(call.position, "Napacno stevilo argumentov!");
+                    }
+                    if (!argumentTypes.get(0).isStr()) {
+                        Report.error(call.position, "Napacen tip argumenta!");
+                    }
+                    types.store(new Type.Atom(Kind.STR), call);
+                    return;
+                }
+                case Constants.printLogLabel -> {
+                    if (argumentTypes.size() != 1) {
+                        Report.error(call.position, "Napacno stevilo argumentov!");
+                    }
+                    if (!argumentTypes.get(0).isLog()) {
+                        Report.error(call.position, "Napacen tip argumenta!");
+                    }
+                    types.store(new Type.Atom(Kind.LOG), call);
+                    return;
+                }
+                case Constants.randIntLabel -> {
+                    if (argumentTypes.size() != 2) {
+                        Report.error(call.position, "Napacno stevilo argumentov!");
+                    }
+                    if (!argumentTypes.get(0).isInt() || !argumentTypes.get(1).isInt()) {
+                        Report.error(call.position, "Napacen tip argumenta!");
+                    }
+                    types.store(new Type.Atom(Kind.INT), call);
+                    return;
+                }
+                default -> {
+                    if (argumentTypes.size() != 1) {
+                        Report.error(call.position, "Napacno stevilo argumentov!");
+                    }
+                    if (!argumentTypes.get(0).isInt()) {
+                        Report.error(call.position, "Napacen tip argumenta!");
+                    }
+                    types.store(new Type.Atom(Kind.INT), call);
+                    return;
+                }
+            }
+        }
 
         var def = definitions.valueFor(call);
         if (def.isPresent()) {
@@ -68,7 +114,7 @@ public class TypeChecker implements Visitor {
                 if (asFunc.isPresent()) {
                     var getAsFunc = asFunc.get();
                     if (getAsFunc.parameters.size() != argumentTypes.size()) {
-                        Report.error("Napačno stevilo argumentov!");
+                        Report.error(call.position, "Napačno stevilo argumentov!");
                     }
                     for (int i = 0; i < getAsFunc.parameters.size(); i++) {
                         if (!(getAsFunc.parameters.get(i).equals(argumentTypes.get(i)))) {
@@ -83,7 +129,7 @@ public class TypeChecker implements Visitor {
                     }
                 }
             }
-            Report.error("Tip funkcije ni definiran!");
+            Report.error(call.position, "Tip funkcije ni definiran!");
         }
     }
 
@@ -101,14 +147,14 @@ public class TypeChecker implements Visitor {
                     types.store(new Type.Atom(Kind.LOG), binary);
                     return;
                 } else {
-                    Report.error("Napaka pri logičnem izrazu!");
+                    Report.error(binary.position, "Napaka pri logičnem izrazu!");
                 }
             } else if (binary.operator.isArithmetic()) {
                 if (leftType.get().isInt() && rightType.get().isInt()) {
                     types.store(new Type.Atom(Kind.INT), binary);
                     return;
                 } else {
-                    Report.error("Napaka pri aritmetičnem izrazu!");
+                    Report.error(binary.position, "Napaka pri aritmetičnem izrazu!");
                 }
             } else if (binary.operator.isComparison()) {
                 if (leftType.get().isInt() && rightType.get().isInt()) {
@@ -126,7 +172,7 @@ public class TypeChecker implements Visitor {
                     types.store(asArray.get().type, binary);
                     return;
                 } else
-                    Report.error("Napaka pri izrazu s tabelami!");
+                    Report.error(binary.position, "Napaka pri izrazu s tabelami!");
             } else if (binary.operator.equals(Binary.Operator.ASSIGN)) {
                 if (leftType.get().equals(rightType.get()) && ((rightType.get().isLog()) || rightType.get().isInt()
                         || rightType.get().isStr())) {
@@ -146,7 +192,7 @@ public class TypeChecker implements Visitor {
         var lastExpression = block.expressions.get(block.expressions.size() - 1);
         var lastExpressionType = types.valueFor(lastExpression);
         lastExpressionType.ifPresentOrElse(value -> types.store(value, block), () -> {
-            Report.error("Neveljaven tip!");
+            Report.error(block.position, "Neveljaven tip zadnjega izraza!");
         });
     }
 
@@ -161,23 +207,23 @@ public class TypeChecker implements Visitor {
         var counterType = types.valueFor(forLoop.counter);
         counterType.ifPresentOrElse(value -> {
             if (!value.isInt())
-                Report.error("Neveljaven tip števca v for zanki!");
-        }, () -> Report.error("Napaka v števcu zanke!"));
+                Report.error(forLoop.counter.position, "Neveljaven tip števca v for zanki!");
+        }, () -> Report.error(forLoop.counter.position, "Napaka v števcu zanke!"));
         var lowType = types.valueFor(forLoop.low);
         lowType.ifPresentOrElse(value -> {
             if (!value.isInt())
-                Report.error("Neveljaven tip spodnje meje v for zanki!");
-        }, () -> Report.error("Napaka v spodnji meji zanke!"));
+                Report.error(forLoop.low.position, "Neveljaven tip spodnje meje v for zanki!");
+        }, () -> Report.error(forLoop.low.position, "Napaka v spodnji meji zanke!"));
         var highType = types.valueFor(forLoop.high);
         highType.ifPresentOrElse(value -> {
             if (!value.isInt())
-                Report.error("Neveljaven tip zgornje meje v for zanki!");
-        }, () -> Report.error("Napaka v zgornji meji zanke!"));
+                Report.error(forLoop.high.position, "Neveljaven tip zgornje meje v for zanki!");
+        }, () -> Report.error(forLoop.high.position, "Napaka v zgornji meji zanke!"));
         var stepType = types.valueFor(forLoop.step);
         stepType.ifPresentOrElse(value -> {
             if (!value.isInt())
-                Report.error("Neveljaven tip inkrementa v for zanki!");
-        }, () -> Report.error("Napaka v inkrementu zanke!"));
+                Report.error(forLoop.step.position, "Neveljaven tip inkrementa v for zanki!");
+        }, () -> Report.error(forLoop.step.position, "Napaka v inkrementu zanke!"));
 
         types.store(new Type.Atom(Kind.VOID), forLoop);
     }
@@ -186,8 +232,11 @@ public class TypeChecker implements Visitor {
     public void visit(Name name) {
         var def = definitions.valueFor(name);
         def.ifPresent(value -> {
+            value.accept(this);
             var type = types.valueFor(value);
-            type.ifPresent(value2 -> types.store(value2, name));
+            type.ifPresentOrElse(value2 -> types.store(value2, name), () -> {
+                Report.error(name.position, "Napaka v imenu!");
+            });
         });
     }
 
@@ -200,8 +249,8 @@ public class TypeChecker implements Visitor {
         var conditionType = types.valueFor(ifThenElse.condition);
         conditionType.ifPresentOrElse(value -> {
             if (!value.isLog())
-                Report.error("Neveljaven tip pogojne izjave!");
-        }, () -> Report.error("Napaka v pogojni izjavi!"));
+                Report.error(ifThenElse.condition.position, "Neveljaven tip pogojne izjave!");
+        }, () -> Report.error(ifThenElse.condition.position, "Napaka v pogojni izjavi!"));
 
         types.store(new Type.Atom(Kind.VOID), ifThenElse);
     }
@@ -219,7 +268,7 @@ public class TypeChecker implements Visitor {
                 types.store(new Type.Atom(Kind.STR), literal);
                 break;
             default:
-                Report.error("Unknown type " + literal.position);
+                Report.error(literal.position, "Neznan tip!");
         }
     }
 
@@ -236,9 +285,9 @@ public class TypeChecker implements Visitor {
                 types.store(new Type.Atom(Kind.INT), unary);
                 return;
             } else {
-                Report.error("Napaka v unarnem izrazu!");
+                Report.error(unary.position, "Napaka v unarnem izrazu!");
             }
-        }, () -> Report.error("Napaka v izrazu!"));
+        }, () -> Report.error(unary.position, "Napaka v izrazu!"));
     }
 
     @Override
@@ -249,8 +298,8 @@ public class TypeChecker implements Visitor {
         var conditionType = types.valueFor(whileLoop.condition);
         conditionType.ifPresentOrElse(value -> {
             if (!value.isLog())
-                Report.error("Neveljaven tip pogoja v while zanki!");
-        }, () -> Report.error("Napaka v pogoju zanke!"));
+                Report.error(whileLoop.condition.position, "Neveljaven tip pogoja v while zanki!");
+        }, () -> Report.error(whileLoop.condition.position, "Napaka v pogoju zanke!"));
 
         types.store(new Type.Atom(Kind.VOID), whileLoop);
     }
@@ -261,7 +310,7 @@ public class TypeChecker implements Visitor {
         where.expr.accept(this);
         var exprType = types.valueFor(where.expr);
         exprType.ifPresentOrElse(value -> types.store(value, where), () -> {
-            Report.error("Neveljaven tip izraza!");
+            Report.error(where.position, "Neveljaven tip izraza!");
         });
     }
 
@@ -281,12 +330,12 @@ public class TypeChecker implements Visitor {
         funDef.parameters.stream().forEach(param -> {
             var paramType = types.valueFor(param);
             paramType.ifPresentOrElse(value -> parameterTypes.add(value),
-                    () -> Report.error("Napaka v tipu parametra!"));
+                    () -> Report.error(funDef.position, "Napaka v tipu parametra!"));
         });
 
         var funType = types.valueFor(funDef.type);
         funType.ifPresentOrElse(value -> types.store(new Type.Function(parameterTypes, value), funDef),
-                () -> Report.error("Napaka v tipih funkcije"));
+                () -> Report.error(funDef.type.position, "Napaka v tipih funkcije"));
 
         funDef.body.accept(this);
         var bodyType = types.valueFor(funDef.body);
@@ -296,9 +345,9 @@ public class TypeChecker implements Visitor {
                 types.store(new Type.Function(parameterTypes, getFunType), funDef);
                 return;
             } else {
-                Report.error("Neveljaven return type v funkciji!");
+                Report.error(funDef.type.position, "Neveljaven return type v funkciji!");
             }
-        }, () -> Report.error("Napaka v body funkcije!"));
+        }, () -> Report.error(funDef.body.position, "Napaka v body funkcije!"));
     }
 
     @Override
@@ -360,7 +409,7 @@ public class TypeChecker implements Visitor {
             case INT -> types.store(new Type.Atom(Kind.INT), atom);
             case LOG -> types.store(new Type.Atom(Kind.LOG), atom);
             case STR -> types.store(new Type.Atom(Kind.STR), atom);
-            default -> Report.error("Unknown type " + atom.position);
+            default -> Report.error(atom.position, "Nepoznan tip atomarnega izraza!");
         }
     }
 
@@ -385,7 +434,7 @@ public class TypeChecker implements Visitor {
                     types.store(array, name);
                     return;
                 });
-            }, () -> Report.error("The type of the type " + name.position + " is not defined"));
-        }, () -> Report.error("Definition of the type " + name.position + " is not defined"));
+            }, () -> Report.error(name.position, "Nedefiniran tip!"));
+        }, () -> Report.error(name.position, "Nedefiniran tip!"));
     }
 }

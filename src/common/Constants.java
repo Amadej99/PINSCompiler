@@ -1,5 +1,7 @@
 package common;
 
+import java.util.List;
+
 public class Constants {
     private Constants() {}
 
@@ -13,6 +15,18 @@ public class Constants {
     public static final String printLogLabel    = "print_log";
     public static final String randIntLabel     = "rand_int";
     public static final String seedLabel        = "seed";
+
+    // 'Registri'
+    public static final String framePointer     = "{FP}";
+    public static final String stackPointer     = "{SP}";
+
+    public static final List<String> Library = List.of(
+        printStringLabel,
+        printIntLabel,
+        printLogLabel,
+        randIntLabel,
+        seedLabel
+    );
 
     static {
         /**
