@@ -27,7 +27,6 @@ public class Iterator {
     }
 
     public void skip() {
-        // System.out.println("Skipping " + getSymbol());
         index++;
     }
 
