@@ -137,6 +137,7 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(Binary binary) {
+        // Sprejmemo levo in desno stran
         binary.left.accept(this);
         binary.right.accept(this);
         var left = imcCode.valueFor(binary.left).get();
@@ -170,8 +171,18 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(Block block) {
+        // Sprejmi vse izraze v bloku
         block.expressions.forEach(expr -> expr.accept(this));
-        // TODO spravi v en line za Tonija <3
+        // Zberi vse izraze razen zadnjega in jih pretvori v IRExpr ali IRStmt
+        // var statements = block.expressions.stream().limit(block.expressions.size() -
+        // 1);
+        // var statementsCasted = statements.map(expr -> imcCode.valueFor(expr).get()
+        // instanceof IRStmt irStmt ? irStmt
+        // : new ExpStmt((IRExpr) imcCode.valueFor(expr).get())).toList();
+        // var last = (IRExpr)
+        // imcCode.valueFor(block.expressions.get(block.expressions.size() - 1)).get();
+        // imcCode.store(new EseqExpr(
+        // new SeqStmt(statementsCasted, last), block));
         imcCode.store(new EseqExpr(
                 new SeqStmt(block.expressions.stream().limit(block.expressions.size() - 1)
                         .map(expr -> imcCode.valueFor(expr).get() instanceof IRStmt irStmt ? irStmt
@@ -182,6 +193,7 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(For forLoop) {
+        // Sprejmi vse izraze v for zanki
         forLoop.counter.accept(this);
         forLoop.low.accept(this);
         forLoop.high.accept(this);
@@ -190,19 +202,27 @@ public class IRCodeGenerator implements Visitor {
 
         var statements = new ArrayList<IRStmt>();
 
+        // Ustvari labele za skok na zacetek zanke, skok na telo zanke in skok na konec
+        // zanke
         var label0 = new LabelStmt(Label.nextAnonymous());
         var label1 = new LabelStmt(Label.nextAnonymous());
         var label2 = new LabelStmt(Label.nextAnonymous());
 
+        // Izracunaj pogoj za skok na telo zanke ali konec zanke
         var cond = new BinopExpr((IRExpr) imcCode.valueFor(forLoop.counter).get(),
                 (IRExpr) imcCode.valueFor(forLoop.high).get(), BinopExpr.Operator.LT);
 
+        // Nastavi zacetno vrednost stevca
         statements.add(new MoveStmt((IRExpr) imcCode.valueFor(forLoop.counter).get(),
                 (IRExpr) imcCode.valueFor(forLoop.low).get()));
+        // Dodaj labelo za začetek zanke
         statements.add(label0);
+        // Dodaj pogoj za skok na telo zanke ali konec zanke
         statements.add(new CJumpStmt(cond, label1.label, label2.label));
+        // Dodaj labelo za telo zanke
         statements.add(label1);
 
+        // Dodaj telo zanke
         imcCode.valueFor(forLoop.body).ifPresent(body -> {
             if (body instanceof IRStmt irStmt)
                 statements.add(irStmt);
@@ -210,10 +230,13 @@ public class IRCodeGenerator implements Visitor {
                 statements.add(new ExpStmt((IRExpr) body));
         });
 
+        // Dodaj povecanje stevca
         statements.add(new MoveStmt((IRExpr) imcCode.valueFor(forLoop.counter).get(),
                 new BinopExpr((IRExpr) imcCode.valueFor(forLoop.counter).get(),
                         (IRExpr) imcCode.valueFor(forLoop.step).get(), BinopExpr.Operator.ADD)));
+        // Dodaj brezpogojni skok na zacetek zanke
         statements.add(new JumpStmt(label0.label));
+        // Dodaj labelo za konec zanke
         statements.add(label2);
 
         imcCode.store(new EseqExpr(new SeqStmt(statements), new ConstantExpr(0)), forLoop);
@@ -221,30 +244,28 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(Name name) {
+        // Preveri ce definicija obstaja
         definitions.valueFor(name).ifPresent(nameValue -> {
+            // Preveri ce access obstaja
             accesses.valueFor(nameValue).ifPresent(accessValue -> {
                 if (accessValue instanceof Access.Global globalAccess) {
                     var type = types.valueFor(nameValue).get();
+                    // Ce je tip imena seznam se dela z naslovom tabele
                     if (type.isArray())
                         imcCode.store(new NameExpr(globalAccess.label), name);
+                    // Ce je tip imena karkoli drugega se dela z vsebino
                     else
                         imcCode.store(new MemExpr(new NameExpr(globalAccess.label)), name);
                 }
 
                 if (accessValue instanceof Access.Parameter parameterAccess) {
+                    // Ce je parameter na istem nivoju kot klicana funkcija se rabimo en mem
                     if (currentFrame.staticLevel == parameterAccess.staticLevel)
                         imcCode.store(new MemExpr(new BinopExpr(NameExpr.FP(), new ConstantExpr(parameterAccess.offset),
                                 BinopExpr.Operator.ADD)), name);
+                    // Ce je razlika med nivojem parametra in klicane funkcije n rabimo n memov
                     else {
-                        var staticLevelDiff = Math.abs(parameterAccess.staticLevel - this.currentFrame.staticLevel);
-                        var location = new MemExpr(NameExpr.FP());
-                        staticLevelDiff--;
-
-                        while (staticLevelDiff != 0) {
-                            location = new MemExpr(location);
-                            staticLevelDiff--;
-                        }
-
+                        var location = calculateStaticLink(parameterAccess.staticLevel, currentFrame.staticLevel);
                         var offset = new BinopExpr(location, new ConstantExpr(parameterAccess.offset),
                                 BinopExpr.Operator.ADD);
                         var memExpr = new MemExpr(offset);
@@ -254,18 +275,24 @@ public class IRCodeGenerator implements Visitor {
 
                 if (accessValue instanceof Access.Local localAccess) {
                     BinopExpr binop;
+                    // Ce je lokalna spremenljivka definirana v klicani funkciji se izracuna samo
+                    // odmik od FPja
                     if (currentFrame.staticLevel == localAccess.staticLevel) {
                         binop = new BinopExpr(NameExpr.FP(), new ConstantExpr(localAccess.offset),
                                 BinopExpr.Operator.ADD);
                         var type = types.valueFor(nameValue).get();
+                        // Ce je tip imena seznam se dela z naslovom tabele, ce ni se dela z vsebino
                         if (type.isArray())
                             imcCode.store(binop, name);
                         else
                             imcCode.store(new MemExpr(binop), name);
                     } else {
+                        // Ce je razlika med nivojem lokalne spremenljivke in klicane funkcije n rabimo
+                        // n memov
                         var location = calculateStaticLink(localAccess.staticLevel, currentFrame.staticLevel);
                         binop = new BinopExpr(location, new ConstantExpr(localAccess.offset), BinopExpr.Operator.ADD);
 
+                        // Ce je tip imena seznam se dela z naslovom tabele, ce ni se dela z vsebino
                         var type = types.valueFor(nameValue).get();
                         if (type.isArray())
                             imcCode.store(binop, name);
@@ -279,37 +306,53 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(IfThenElse ifThenElse) {
+        // Sprejmi pogoj, then in else
         ifThenElse.condition.accept(this);
         ifThenElse.thenExpression.accept(this);
         ifThenElse.elseExpression.ifPresent(expr -> expr.accept(this));
 
         var statements = new ArrayList<IRStmt>();
 
+        // Ustvari labelo za then else in konec (else je lahko neuporabljen)
         var label1 = new LabelStmt(Label.nextAnonymous());
         var label2 = new LabelStmt(Label.nextAnonymous());
         var label3 = new LabelStmt(Label.nextAnonymous());
 
         imcCode.valueFor(ifThenElse.condition).ifPresent(ifValue -> {
             imcCode.valueFor(ifThenElse.thenExpression).ifPresent(thenValue -> {
+                // Ce je then izraz je potrebno ustvariti ExpStmt, ce ni se uporabi stavek
                 var thenExpr = thenValue instanceof IRStmt irStmt ? irStmt : new ExpStmt((IRExpr) thenValue);
 
+                // Ce else obstaja
                 if (ifThenElse.elseExpression.isPresent()) {
+                    // Ustvarimo pogojni skok na then in else
                     statements.add(new CJumpStmt((IRExpr) ifValue, label1.label, label2.label));
+                    // Dodamo labelo za then
                     statements.add(label1);
+                    // Dodamo telo then
                     statements.add(thenExpr);
+                    // Dodamo brezpogojni skok na konec
                     statements.add(new JumpStmt(label3.label));
+                    // Dodamo labelo za else
                     statements.add(label2);
+                    // Ce je else izraz je potrebno ustvariti ExpStmt, ce ni se uporabi stavek
                     imcCode.valueFor(ifThenElse.elseExpression.get()).ifPresent(elseValue -> {
                         if (elseValue instanceof IRStmt irStmt)
                             statements.add(irStmt);
                         else
                             statements.add(new ExpStmt((IRExpr) elseValue));
                     });
+                    // Dodamo labelo za konec
                     statements.add(label3);
                 } else {
+                    // Ce else ne obstaja
+                    // Dodamo pogojni skok na then in konec
                     statements.add(new CJumpStmt((IRExpr) ifValue, label1.label, label3.label));
+                    // Dodamo labelo za then
                     statements.add(label1);
+                    // Dodamo telo then
                     statements.add(thenExpr);
+                    // Dodamo labelo za konec
                     statements.add(label3);
                 }
 
@@ -321,11 +364,14 @@ public class IRCodeGenerator implements Visitor {
     @Override
     public void visit(Literal literal) {
         types.valueFor(literal).ifPresent(type -> {
+            // Ce je literal int se ustvari konstanta z vrednostjo literala
             if (type.isInt())
                 imcCode.store(new ConstantExpr(Integer.parseInt(literal.value)), literal);
+            // Ce je literal logical se ustvari konstanta z vrednostjo literala
             else if (type.isLog())
                 imcCode.store(new ConstantExpr(literal.value.equals("true") ? 1 : 0), literal);
             else if (type.isStr()) {
+                // Ce je literal string se zanj ustvari labela in se ustvari data chunk
                 Label label = Label.nextAnonymous();
                 var dataChunk = new Chunk.DataChunk(new Access.Global(Constants.WordSize, label), literal.value);
                 chunks.add(dataChunk);
@@ -338,11 +384,17 @@ public class IRCodeGenerator implements Visitor {
     public void visit(Unary unary) {
         unary.expr.accept(this);
         imcCode.valueFor(unary.expr).ifPresent(unaryValue -> {
+            // Ce je operator + gre za predznak in simbolicno sestejemo z
+            // konstanto 0
             if (unary.operator.equals(Unary.Operator.ADD))
                 imcCode.store(new BinopExpr(new ConstantExpr(0), (IRExpr) unaryValue, BinopExpr.Operator.ADD), unary);
             else if (unary.operator.equals(Unary.Operator.SUB))
+                // Ce je operator - gre za predznak in konstanto odstejemo od nic da dobimo
+                // negativno stevilo
                 imcCode.store(new BinopExpr(new ConstantExpr(0), (IRExpr) unaryValue, BinopExpr.Operator.SUB), unary);
             else if (unary.operator.equals(Unary.Operator.NOT)) {
+                // Ce je operator ! gre za negacijo in vrednost odstejemo od 0 da dobimo
+                // ustrezno logicno vrednost
                 imcCode.store(new BinopExpr(new ConstantExpr(1), (IRExpr) unaryValue, BinopExpr.Operator.SUB), unary);
             }
         });
@@ -350,18 +402,24 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(While whileLoop) {
+        // Sprejmemo pogoj in telo
         whileLoop.condition.accept(this);
         whileLoop.body.accept(this);
 
         List<IRStmt> statements = new ArrayList<IRStmt>();
 
+        // Usrvarimo labelo za zacetek, telo in konec
         var label0 = new LabelStmt(Label.nextAnonymous());
         var label1 = new LabelStmt(Label.nextAnonymous());
         var label2 = new LabelStmt(Label.nextAnonymous());
 
+        // Dodamo labelo za zacetek
         statements.add(label0);
+        // Dodamo pogojni skok na telo ali kone
         statements.add(new CJumpStmt((IRExpr) imcCode.valueFor(whileLoop.condition).get(), label1.label, label2.label));
+        // Dodamo labelo za telo
         statements.add(label1);
+        // Ce je telo izraz je potrebno ustvariti ExpStmt, ce ni se uporabi stavek
         imcCode.valueFor(whileLoop.body).ifPresent(bodyValue -> {
             if (bodyValue instanceof IRStmt irStmt)
                 statements.add(irStmt);
@@ -369,7 +427,9 @@ public class IRCodeGenerator implements Visitor {
                 statements.add(new ExpStmt((IRExpr) bodyValue));
         });
 
+        // Dodamo brezpogojni skok na zacetek
         statements.add(new JumpStmt(label0.label));
+        // Dodamo labelo za konec
         statements.add(label2);
 
         imcCode.store(new EseqExpr(new SeqStmt(statements), new ConstantExpr(0)), whileLoop);
@@ -377,6 +437,7 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(Where where) {
+        // Sprejmemo definicije in izraz
         where.defs.accept(this);
         where.expr.accept(this);
 
@@ -392,10 +453,14 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(FunDef funDef) {
+        // Shranimo star frame in nastavimo nov trenutni frame
         Frame oldFrame = this.currentFrame;
         this.currentFrame = frames.valueFor(funDef).get();
+        // Sprejmemo telo funkcije
         funDef.body.accept(this);
 
+        // Ce je telo izraz je potrebno return value shraniti v FP
+        // Ce je telo stavek je stavek potrebno le izvesti
         imcCode.valueFor(funDef.body).ifPresent(bodyValue -> {
             if (bodyValue instanceof IRExpr irExpr)
                 chunks.add(new Chunk.CodeChunk(currentFrame, new MoveStmt(new MemExpr(NameExpr.FP()), irExpr)));
@@ -411,6 +476,7 @@ public class IRCodeGenerator implements Visitor {
 
     @Override
     public void visit(VarDef varDef) {
+        // Ce je access globlen ustvarimo globalni chunk
         accesses.valueFor(varDef).ifPresent(varValue -> {
             if (varValue instanceof Access.Global varGlobal) {
                 chunks.add(new Chunk.GlobalChunk(varGlobal));
@@ -435,6 +501,7 @@ public class IRCodeGenerator implements Visitor {
     }
 
     private MemExpr calculateStaticLink(int targetLevel, int frameLevel) {
+        // Izracunamo razliko med ciljnim in trenutnim levelom
         var diff = Math.abs(targetLevel - frameLevel);
         var location = new MemExpr(NameExpr.FP());
         diff--;

@@ -70,6 +70,7 @@ public class Interpreter {
     }
 
     private void internalInterpret(CodeChunk chunk, Map<Frame.Temp, Object> temps) {
+        // Prestavimo frame in stack pointer
         framePointer = stackPointer;
         stackPointer -= chunk.frame.size();
 
@@ -91,6 +92,7 @@ public class Interpreter {
             throw new RuntimeException("Linearize IR!");
         }
 
+        // Stack in frame pointer prestavimo nazaj
         stackPointer = framePointer;
         framePointer = toInt(memory.ldM(framePointer - chunk.frame.oldFPOffset()));
     }
@@ -112,6 +114,9 @@ public class Interpreter {
     }
 
     private Object execute(CJumpStmt cjump, Map<Frame.Temp, Object> temps) {
+        // Preverimo pogoj, v kolikor je true se skoči na thenLabel, v kolikor je false
+        // se skoči na elseLabel (ki je lahko tudi label za konec v kolikor else ni
+        // definiran)
         var condition = toBool(execute(cjump.condition, temps));
         if (condition)
             return cjump.thenLabel;
@@ -125,15 +130,18 @@ public class Interpreter {
     }
 
     private Object execute(JumpStmt jump, Map<Frame.Temp, Object> temps) {
+        // Skoci na label
         return jump.label;
     }
 
     private Object execute(MoveStmt move, Map<Frame.Temp, Object> temps) {
+        // Ce izvajamo move v temp potem se vrednost samo shrani v temp slovar
         if (move.dst instanceof TempExpr tempExpr) {
             temps.put(tempExpr.temp, execute(move.src, temps));
             return null;
         }
 
+        // Ce shranjujemo v pomnilnik potem se vrednost shrani v pomnilnik
         if (move.dst instanceof MemExpr memExpr) {
             var destination = execute(memExpr.expr, temps);
             var source = execute(move.src, temps);
@@ -165,9 +173,11 @@ public class Interpreter {
     }
 
     private Object execute(BinopExpr binop, Map<Frame.Temp, Object> temps) {
+        // Izracunamo levo in desno stran izraza
         var left = execute(binop.lhs, temps);
         var right = execute(binop.rhs, temps);
 
+        // Izracunamo rezultat glede na operator
         switch (binop.op) {
             case ADD -> {
                 return toInt(left) + toInt(right);
@@ -213,6 +223,7 @@ public class Interpreter {
     }
 
     private Object execute(CallExpr call, Map<Frame.Temp, Object> temps) {
+        // Preverimo ce je klic funkcije standardne knjiznice
         if (call.label.name.equals(Constants.printIntLabel)) {
             if (call.args.size() != 2) {
                 throw new RuntimeException("Invalid argument count!");
@@ -250,6 +261,9 @@ public class Interpreter {
             random = new Random(seed);
             return null;
         } else if (memory.ldM(call.label) instanceof CodeChunk chunk) {
+            // Ce ni standardna knjiznica, potem je to klic funkcije
+            // Izracunamo vrednosti argumentov in jih shranimo v argumente klicnega zapisa z
+            // njihovim odmikom, prvi je na odmiku 0 in je vedno static link
             int offset = 0;
             for (var arg : call.args) {
                 var value = execute(arg, temps);
@@ -257,7 +271,10 @@ public class Interpreter {
                 offset += 4;
             }
 
+            // Izvedemo klicano funkcijo
             internalInterpret(chunk, new HashMap<>());
+            // TODO: kam tocno
+            // Rezultat funkcije zapisemo v pomnilnik
             var result = memory.ldM(stackPointer);
             return result;
         } else {
@@ -270,11 +287,13 @@ public class Interpreter {
     }
 
     private Object execute(MemExpr mem, Map<Frame.Temp, Object> temps) {
+        // Izracunamo naslov in vrnemo vrednost na njem
         var address = execute(mem.expr, temps);
         return memory.ldM(toInt(address));
     }
 
     private Object execute(NameExpr name) {
+        // Preverimo ce je to FP ali SP, sicer vrnemo naslov s to labelo
         if (name.label.name.equals("{FP}"))
             return framePointer;
         if (name.label.name.equals("{SP}"))
@@ -283,6 +302,7 @@ public class Interpreter {
     }
 
     private Object execute(TempExpr temp, Map<Frame.Temp, Object> temps) {
+        // Dobimo vrednost iz temp slovarja
         return temps.get(temp.temp);
     }
 
