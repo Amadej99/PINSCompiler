@@ -109,6 +109,7 @@ public class TypeChecker implements Visitor {
             var findType = types.valueFor(getDef);
 
             // Sprejmi tip funkcije, ce ga se ni
+            // To je v primeru, da je tip definiran kasneje kot je funkcija definirana
             if (!findType.isPresent()) {
                 getDef.accept(this);
                 findType = types.valueFor(getDef);
@@ -461,6 +462,8 @@ public class TypeChecker implements Visitor {
         def.ifPresentOrElse(definition -> {
             var findType = types.valueFor(definition);
 
+            // Sprejmi tip, ce ga se ni
+            // To je v primeru, da je tip definiran kasneje kot je uporabljen
             if (!findType.isPresent()) {
                 definition.accept(this);
                 findType = types.valueFor(definition);
