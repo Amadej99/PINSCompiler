@@ -2,11 +2,11 @@
   "configurations": [
     {
       "type": "java",
-      "name": "Main",
+      "name": "INT",
       "request": "launch",
       "mainClass": "Main",
       "projectName": "PINSCompiler_e8d56c1a",
-      "args": "PINS pins.txt --dump FRM --exec FRM"
+      "args": "PINS pins.txt --dump INT --exec INT"
     }
   ]
 }
