@@ -141,7 +141,7 @@ public class Interpreter {
             return null;
         }
 
-        // Ce shranjujemo v pomnilnik potem se vrednost shrani v pomnilnik
+        // Ce shranjujemo v pomnilnik potem se vrednost shrani v pomnilnik (ne derefernciramo do konca, saj rabimo naslov v pomnilniku)
         if (move.dst instanceof MemExpr memExpr) {
             var destination = execute(memExpr.expr, temps);
             var source = execute(move.src, temps);
@@ -273,8 +273,7 @@ public class Interpreter {
 
             // Izvedemo klicano funkcijo
             internalInterpret(chunk, new HashMap<>());
-            // TODO: kam tocno
-            // Rezultat funkcije zapisemo v pomnilnik
+            // Rezultat funkcije preberemo s stack pointerja - prepisal je argumente
             var result = memory.ldM(stackPointer);
             return result;
         } else {
