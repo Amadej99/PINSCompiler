@@ -9,7 +9,6 @@ import static common.RequireNonNull.requireNonNull;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import common.Constants;
 import compiler.common.Visitor;
@@ -148,14 +147,13 @@ public class IRCodeGenerator implements Visitor {
             imcCode.store(new EseqExpr(new MoveStmt((IRExpr) left, (IRExpr) right), (IRExpr) left), binary);
         } else if (binary.operator.equals(Binary.Operator.ARR)) {
             // Ce je operator za tabelo locimo dva primera
-            types.valueFor(binary).ifPresent(binaryValue -> {
-                var offset = new BinopExpr((IRExpr) right, new ConstantExpr(binaryValue.sizeInBytes()),
+            types.valueFor(binary).ifPresent(typeOfArray -> {
+                var offset = new BinopExpr((IRExpr) right, new ConstantExpr(typeOfArray.sizeInBytes()),
                         BinopExpr.Operator.MUL);
 
-                // TODO: razlaga
                 var location = new BinopExpr((IRExpr) left, offset, BinopExpr.Operator.ADD);
-                var type = types.valueFor(binary).get();
-                if (type.isArray()) {
+
+                if (typeOfArray.isArray()) {
                     // Ce je tip tabele tabela se shrani naslov tabele (multi dimenzionalna tabela)
                     imcCode.store(location, binary);
                 } else
@@ -163,7 +161,7 @@ public class IRCodeGenerator implements Visitor {
                     imcCode.store(new MemExpr(location), binary);
             });
         } else {
-            // Ce je operator binaren izvedemo Binop operacijo
+            // Ce je operator eden od ostalih (+, -, /, *, <=, ==, ...) izvedemo to operacijo
             imcCode.store(new BinopExpr((IRExpr) left, (IRExpr) right,
                     BinopExpr.Operator.valueOf(binary.operator.toString())), binary);
         }
@@ -174,21 +172,14 @@ public class IRCodeGenerator implements Visitor {
         // Sprejmi vse izraze v bloku
         block.expressions.forEach(expr -> expr.accept(this));
         // Zberi vse izraze razen zadnjega in jih pretvori v IRExpr ali IRStmt
-        // var statements = block.expressions.stream().limit(block.expressions.size() -
-        // 1);
-        // var statementsCasted = statements.map(expr -> imcCode.valueFor(expr).get()
-        // instanceof IRStmt irStmt ? irStmt
-        // : new ExpStmt((IRExpr) imcCode.valueFor(expr).get())).toList();
-        // var last = (IRExpr)
-        // imcCode.valueFor(block.expressions.get(block.expressions.size() - 1)).get();
-        // imcCode.store(new EseqExpr(
-        // new SeqStmt(statementsCasted, last), block));
-        imcCode.store(new EseqExpr(
-                new SeqStmt(block.expressions.stream().limit(block.expressions.size() - 1)
-                        .map(expr -> imcCode.valueFor(expr).get() instanceof IRStmt irStmt ? irStmt
-                                : new ExpStmt((IRExpr) imcCode.valueFor(expr).get()))
-                        .collect(Collectors.toList())),
-                (IRExpr) imcCode.valueFor(block.expressions.get(block.expressions.size() - 1)).get()), block);
+        var statements = block.expressions.stream().limit(block.expressions.size() - 1)
+                .map(expr -> imcCode.valueFor(expr).get() instanceof IRStmt irStmt ? irStmt
+                        : new ExpStmt((IRExpr) imcCode.valueFor(expr).get()))
+                .toList();
+
+        var last = (IRExpr) imcCode.valueFor(block.expressions.get(block.expressions.size() - 1)).get();
+
+        imcCode.store(new EseqExpr(new SeqStmt(statements), last), block);
     }
 
     @Override
@@ -250,55 +241,31 @@ public class IRCodeGenerator implements Visitor {
             accesses.valueFor(nameValue).ifPresent(accessValue -> {
                 if (accessValue instanceof Access.Global globalAccess) {
                     var type = types.valueFor(nameValue).get();
-                    // Ce je tip imena seznam se dela z naslovom tabele
+                    // Ce je tip imena seznam se dela z naslovom tabele, ne potrebujemo MEM
                     if (type.isArray())
                         imcCode.store(new NameExpr(globalAccess.label), name);
-                    // Ce je tip imena karkoli drugega se dela z vsebino
+                    // Ce je tip imena karkoli drugega se dela z vsebino, rabimo MEM
                     else
                         imcCode.store(new MemExpr(new NameExpr(globalAccess.label)), name);
                 }
 
                 if (accessValue instanceof Access.Parameter parameterAccess) {
-                    // Ce je parameter na istem nivoju kot klicana funkcija se rabimo en mem
-                    if (currentFrame.staticLevel == parameterAccess.staticLevel)
-                        imcCode.store(new MemExpr(new BinopExpr(NameExpr.FP(), new ConstantExpr(parameterAccess.offset),
-                                BinopExpr.Operator.ADD)), name);
-                    // Ce je razlika med nivojem parametra in klicane funkcije n rabimo n memov
-                    else {
-                        var location = calculateStaticLink(parameterAccess.staticLevel, currentFrame.staticLevel);
-                        var offset = new BinopExpr(location, new ConstantExpr(parameterAccess.offset),
-                                BinopExpr.Operator.ADD);
-                        var memExpr = new MemExpr(offset);
-                        imcCode.store(memExpr, name);
-                    }
+                    // Izracunam Static Link in s dobim vrednost spremenljivke
+                    var staticLink = calculateStaticLink(parameterAccess.staticLevel, currentFrame.staticLevel);
+                    var offset = new BinopExpr(staticLink, new ConstantExpr(parameterAccess.offset),
+                            BinopExpr.Operator.ADD);
+
+                    imcCode.store(new MemExpr(offset), name);
                 }
 
                 if (accessValue instanceof Access.Local localAccess) {
-                    BinopExpr binop;
-                    // Ce je lokalna spremenljivka definirana v klicani funkciji se izracuna samo
-                    // odmik od FPja
-                    if (currentFrame.staticLevel == localAccess.staticLevel) {
-                        binop = new BinopExpr(NameExpr.FP(), new ConstantExpr(localAccess.offset),
-                                BinopExpr.Operator.ADD);
-                        var type = types.valueFor(nameValue).get();
-                        // Ce je tip imena seznam se dela z naslovom tabele, ce ni se dela z vsebino
-                        if (type.isArray())
-                            imcCode.store(binop, name);
-                        else
-                            imcCode.store(new MemExpr(binop), name);
-                    } else {
-                        // Ce je razlika med nivojem lokalne spremenljivke in klicane funkcije n rabimo
-                        // n memov
-                        var location = calculateStaticLink(localAccess.staticLevel, currentFrame.staticLevel);
-                        binop = new BinopExpr(location, new ConstantExpr(localAccess.offset), BinopExpr.Operator.ADD);
-
-                        // Ce je tip imena seznam se dela z naslovom tabele, ce ni se dela z vsebino
-                        var type = types.valueFor(nameValue).get();
-                        if (type.isArray())
-                            imcCode.store(binop, name);
-                        else
-                            imcCode.store(new MemExpr(binop), name);
-                    }
+                    // Izracunam Static Link in s dobim vrednost spremenljivke
+                    BinopExpr staticLink = new BinopExpr(calculateStaticLink(localAccess.staticLevel, currentFrame.staticLevel), new ConstantExpr(localAccess.offset), BinopExpr.Operator.ADD);
+                    var type = types.valueFor(nameValue).get();
+                    if (type.isArray())
+                        imcCode.store(staticLink, name);
+                    else
+                        imcCode.store(new MemExpr(staticLink), name);
                 }
             });
         });
@@ -393,7 +360,7 @@ public class IRCodeGenerator implements Visitor {
                 // negativno stevilo
                 imcCode.store(new BinopExpr(new ConstantExpr(0), (IRExpr) unaryValue, BinopExpr.Operator.SUB), unary);
             else if (unary.operator.equals(Unary.Operator.NOT)) {
-                // Ce je operator ! gre za negacijo in vrednost odstejemo od 0 da dobimo
+                // Ce je operator ! gre za negacijo in vrednost odstejemo od 1 da dobimo
                 // ustrezno logicno vrednost
                 imcCode.store(new BinopExpr(new ConstantExpr(1), (IRExpr) unaryValue, BinopExpr.Operator.SUB), unary);
             }
@@ -459,14 +426,8 @@ public class IRCodeGenerator implements Visitor {
         // Sprejmemo telo funkcije
         funDef.body.accept(this);
 
-        // Ce je telo izraz je potrebno return value shraniti v FP
-        // Ce je telo stavek je stavek potrebno le izvesti
-        imcCode.valueFor(funDef.body).ifPresent(bodyValue -> {
-            if (bodyValue instanceof IRExpr irExpr)
-                chunks.add(new Chunk.CodeChunk(currentFrame, new MoveStmt(new MemExpr(NameExpr.FP()), irExpr)));
-            else if (bodyValue instanceof IRStmt irStmt)
-                chunks.add(new Chunk.CodeChunk(currentFrame, irStmt));
-        });
+        // Izraz je potrebno return value shraniti v FP
+        imcCode.valueFor(funDef.body).ifPresent(bodyValue -> chunks.add(new Chunk.CodeChunk(currentFrame, new MoveStmt(new MemExpr(NameExpr.FP()), (IRExpr) bodyValue))));
         this.currentFrame = oldFrame;
     }
 
@@ -500,9 +461,13 @@ public class IRCodeGenerator implements Visitor {
     public void visit(TypeName name) {
     }
 
-    private MemExpr calculateStaticLink(int targetLevel, int frameLevel) {
-        // Izracunamo razliko med ciljnim in trenutnim levelom
+    private IRExpr calculateStaticLink(int targetLevel, int frameLevel) {
         var diff = Math.abs(targetLevel - frameLevel);
+        // Ce je razlika 0 je static link kar FP
+        if (diff == 0)
+            return NameExpr.FP();
+
+        // Ce je razlika vecja od 0 potrebujemo toliko dereferenciranj kolikor je razlika
         var location = new MemExpr(NameExpr.FP());
         diff--;
 
