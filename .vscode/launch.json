@@ -2,11 +2,34 @@
   "configurations": [
     {
       "type": "java",
+      "name": "Main",
+      "request": "launch",
+      "mainClass": "Main",
+      "projectName": "PINSCompiler"
+    },
+    {
+      "type": "java",
       "name": "INT",
       "request": "launch",
       "mainClass": "Main",
-      "projectName": "PINSCompiler_e8d56c1a",
+      "projectName": "PINSCompiler_e4e36e37",
       "args": "PINS pins.txt --dump INT --exec INT"
+    },
+    {
+      "type": "java",
+      "name": "IMC",
+      "request": "launch",
+      "mainClass": "Main",
+      "projectName": "PINSCompiler_e4e36e37",
+      "args": "PINS pins.txt --dump IMC --exec IMC"
+    },
+    {
+      "type": "java",
+      "name": "TYP",
+      "request": "launch",
+      "mainClass": "Main",
+      "projectName": "PINSCompiler_e4e36e37",
+      "args": "PINS pins.txt --dump TYP --exec TYP"
     }
   ]
 }
