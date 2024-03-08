@@ -1,13 +1,21 @@
+
 /**
  * @Author: turk
  * @Description: Vhodna točka prevajalnika.
  */
+
+import static org.bytedeco.llvm.global.LLVM.*;
 
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Optional;
+
+import org.bytedeco.llvm.LLVM.LLVMBuilderRef;
+import org.bytedeco.llvm.LLVM.LLVMContextRef;
+import org.bytedeco.llvm.LLVM.LLVMModuleRef;
+import org.bytedeco.llvm.LLVM.LLVMTypeRef;
 
 import cli.PINS;
 import cli.PINS.Phase;
@@ -41,9 +49,7 @@ public class Main {
         run(cli);
     }
 
-
     // -------------------------------------------------------------------
-
 
     private static void run(PINS cli) throws IOException {
         var sourceCode = Files.readString(Paths.get(cli.sourceFile));
@@ -74,6 +80,7 @@ public class Main {
         if (cli.execPhase == Phase.SYN) {
             return;
         }
+
         /**
          * Abstraktna sintaksa.
          */
@@ -112,6 +119,9 @@ public class Main {
         if (cli.execPhase == Phase.TYP) {
             return;
         }
+
+        
+
         /**
          * Izvedi analizo klicnih zapisov in dostopov.
          */
@@ -152,7 +162,8 @@ public class Main {
          * Izvajanje vmesne kode.
          */
         if (mainCodeChunk.isPresent()) {
-            Optional<PrintStream> outputStream = cli.dumpPhases.contains(Phase.INT) ? Optional.of(System.out) : Optional.empty();
+            Optional<PrintStream> outputStream = cli.dumpPhases.contains(Phase.INT) ? Optional.of(System.out)
+                    : Optional.empty();
             var interpreter = new Interpreter(memory, outputStream);
             interpreter.interpret(mainCodeChunk.get());
         }
