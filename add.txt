@@ -1,0 +1,8 @@
+fun add ( a : integer, b : integer ) : integer = (
+    {result = a + b}, result
+) { where var result : integer };
+
+fun main ( argc : integer ) : integer = (
+    { a = 10 }, { b = 5 },
+    add(a, b)
+) { where var a : integer; var b : integer }
