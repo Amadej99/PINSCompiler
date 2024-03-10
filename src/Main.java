@@ -12,9 +12,11 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Optional;
 
+import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef;
 import org.bytedeco.llvm.LLVM.LLVMContextRef;
 import org.bytedeco.llvm.LLVM.LLVMModuleRef;
+import org.bytedeco.llvm.LLVM.LLVMPassManagerRef;
 import org.bytedeco.llvm.LLVM.LLVMTypeRef;
 
 import cli.PINS;
@@ -28,6 +30,7 @@ import compiler.gen.Memory;
 import compiler.interpret.Interpreter;
 import compiler.ir.IRCodeGenerator;
 import compiler.ir.IRPrettyPrint;
+import compiler.ir.LLVMCodeGenerator;
 import compiler.lexer.Lexer;
 import compiler.parser.Parser;
 import compiler.parser.ast.def.Def;
@@ -120,7 +123,24 @@ public class Main {
             return;
         }
 
-        
+        final BytePointer error = new BytePointer();
+        LLVMContextRef context = LLVMContextCreate();
+        LLVMModuleRef module = LLVMModuleCreateWithNameInContext("factorial", context);
+        LLVMBuilderRef builder = LLVMCreateBuilderInContext(context);
+
+        if (cli.dumpPhases.contains(Phase.IMC)) {
+            var LLVMCodeGenerator = new LLVMCodeGenerator(context, module, builder, types);
+            ast.accept(LLVMCodeGenerator);
+
+            if (LLVMVerifyModule(module, LLVMPrintMessageAction, error) != 0) {
+                LLVMDisposeMessage(error);
+                return;
+            }
+
+            LLVMPassManagerRef pm = LLVMCreatePassManager();
+            LLVMRunPassManager(pm, module);
+            LLVMDumpModule(module);
+        }
 
         /**
          * Izvedi analizo klicnih zapisov in dostopov.

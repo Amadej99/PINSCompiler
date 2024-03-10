@@ -3,7 +3,14 @@ package compiler.ir;
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef;
 import org.bytedeco.llvm.LLVM.LLVMContextRef;
 import org.bytedeco.llvm.LLVM.LLVMModuleRef;
+import org.bytedeco.llvm.LLVM.LLVMTypeRef;
+import org.bytedeco.llvm.LLVM.LLVMValueRef;
+
+import common.Report;
+
 import static org.bytedeco.llvm.global.LLVM.*;
+
+import org.bytedeco.javacpp.PointerPointer;
 
 import compiler.common.Visitor;
 import compiler.parser.ast.def.Def;
@@ -27,6 +34,8 @@ import compiler.parser.ast.type.Atom;
 import compiler.parser.ast.type.TypeName;
 import compiler.seman.common.NodeDescription;
 import compiler.seman.type.type.Type;
+import java.util.stream.IntStream;
+import java.util.HashMap;
 
 public class LLVMCodeGenerator implements Visitor {
 
@@ -55,28 +64,61 @@ public class LLVMCodeGenerator implements Visitor {
      */
     public NodeDescription<Type> types;
 
-    public LLVMCodeGenerator(LLVMModuleRef module) {
+    /**
+     * 
+     */
+    public NodeDescription<LLVMValueRef> IRNodes;
+
+    /**
+     *
+     */
+    public HashMap<String, LLVMValueRef> NamedValues;
+
+    public LLVMCodeGenerator(LLVMContextRef context, LLVMModuleRef module, LLVMBuilderRef builder, NodeDescription<Type> types) {
+        this.context = context;
         this.module = module;
-        this.context = LLVMContextCreate();
-        this.builder = LLVMCreateBuilderInContext(context);
+        this.builder = builder;
+        this.types = types;
+        this.IRNodes = new NodeDescription<LLVMValueRef>();
+        this.NamedValues = new HashMap<String, LLVMValueRef>();
     }
 
     @Override
     public void visit(Call call) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        var calledFunction = LLVMGetNamedFunction(module, call.name);
+
+        call.arguments.forEach(argument -> argument.accept(this));
+
+        var calledFunctionParameterSize = LLVMCountParams(calledFunction);
+
+        var arguments = new PointerPointer<>(calledFunctionParameterSize);
+
+        IntStream.range(0, calledFunctionParameterSize).forEach(i -> {
+            IRNodes.valueFor(call.arguments.get(i)).ifPresent(value -> arguments.put(i, value));
+        });
+
+        LLVMBuildCall2(builder, LLVMTypeOf(calledFunction), calledFunction, arguments, calledFunctionParameterSize,
+                call.name);
     }
 
     @Override
     public void visit(Binary binary) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        binary.left.accept(this);
+        binary.right.accept(this);
+
+        var left = IRNodes.valueFor(binary.left).get();
+        var right = IRNodes.valueFor(binary.right).get();
+
+        if (binary.operator.equals(Binary.Operator.ASSIGN)) {
+            LLVMBuildStore(builder, right, left);
+        } else if (binary.operator.equals(Binary.Operator.ADD)) {
+            LLVMBuildAdd(builder, left, right, "Add");
+        }
     }
 
     @Override
     public void visit(Block block) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        block.expressions.forEach(expr -> expr.accept(this));
     }
 
     @Override
@@ -87,8 +129,6 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(Name name) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
     }
 
     @Override
@@ -101,11 +141,11 @@ public class LLVMCodeGenerator implements Visitor {
     public void visit(Literal literal) {
         types.valueFor(literal).ifPresent(type -> {
             if (type.isInt())
-                LLVMConstInt(LLVMInt32Type(), Integer.parseInt(literal.value), 0);
+                IRNodes.store(LLVMConstInt(LLVMInt32Type(), Integer.parseInt(literal.value), 0), literal);
             else if (type.isLog())
-                LLVMConstInt(LLVMInt1Type(), literal.value.equals("true") ? 1 : 0, 0);
+                IRNodes.store(LLVMConstInt(LLVMInt1Type(), literal.value.equals("true") ? 1 : 0, 0), literal);
             else if (type.isStr())
-                LLVMConstString(literal.value, literal.value.length(), 0);
+                IRNodes.store(LLVMConstString(literal.value, literal.value.length(), 0), literal);
         });
     }
 
@@ -134,8 +174,37 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(FunDef funDef) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        var parameterTypes = new PointerPointer<>(funDef.parameters.size());
+
+        IntStream.range(0, funDef.parameters.size()).forEach(i -> {
+            Parameter parameter = funDef.parameters.get(i);
+            types.valueFor(parameter.type).ifPresent(type -> {
+                if (type.isInt())
+                    parameterTypes.put(i, LLVMInt32TypeInContext(context));
+                // TODO: Ostali podatkovni tipi.
+            });
+        });
+
+        LLVMTypeRef functionType = null;
+        var funDefType = types.valueFor(funDef.type);
+        if (funDefType.isPresent()) {
+            functionType = LLVMFunctionType(LLVMInt32TypeInContext(context), parameterTypes, funDef.parameters.size(),
+                    0);
+        } else {
+            Report.error("Napaka pri kreiranju funkcije");
+        }
+
+        var function = LLVMAddFunction(module, funDef.name, functionType);
+
+        IRNodes.store(function, funDef);
+
+        LLVMCreateBasicBlockInContext(context, "entry");
+
+        NamedValues.clear();
+
+        funDef.parameters.forEach(parameter -> parameter.accept(this));
+
+        funDef.body.accept(this);
     }
 
     @Override
@@ -147,14 +216,15 @@ public class LLVMCodeGenerator implements Visitor {
     @Override
     public void visit(VarDef varDef) {
         types.valueFor(varDef.type).ifPresent(type -> {
+            // IRNodes.store(LLVMBuildAlloca(builder, LLVMInt32Type(), varDef.name),
+            // varDef);
+            NamedValues.put(varDef.name, LLVMBuildAlloca(builder, LLVMInt32Type(), varDef.name));
         });
     }
 
     @Override
     public void visit(Parameter parameter) {
-        types.valueFor(parameter.type).ifPresent(type -> {
-
-        });
+        NamedValues.put(parameter.name, LLVMBuildAlloca(builder, LLVMInt32TypeInContext(context), parameter.name));
     }
 
     @Override

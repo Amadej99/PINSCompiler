@@ -21,7 +21,7 @@
       "request": "launch",
       "mainClass": "Main",
       "projectName": "PINSCompiler_e4e36e37",
-      "args": "PINS pins.txt --dump IMC --exec IMC"
+      "args": "PINS add.txt --dump IMC --exec IMC"
     },
     {
       "type": "java",
@@ -29,7 +29,7 @@
       "request": "launch",
       "mainClass": "Main",
       "projectName": "PINSCompiler_e4e36e37",
-      "args": "PINS pins.txt --dump TYP --exec TYP"
+      "args": "PINS add.txt --dump TYP --exec TYP"
     }
   ]
 }
