@@ -15,9 +15,10 @@ import java.util.Optional;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef;
 import org.bytedeco.llvm.LLVM.LLVMContextRef;
+import org.bytedeco.llvm.LLVM.LLVMExecutionEngineRef;
+import org.bytedeco.llvm.LLVM.LLVMGenericValueRef;
 import org.bytedeco.llvm.LLVM.LLVMModuleRef;
 import org.bytedeco.llvm.LLVM.LLVMPassManagerRef;
-import org.bytedeco.llvm.LLVM.LLVMTypeRef;
 
 import cli.PINS;
 import cli.PINS.Phase;
@@ -125,67 +126,40 @@ public class Main {
 
         final BytePointer error = new BytePointer();
         LLVMContextRef context = LLVMContextCreate();
-        LLVMModuleRef module = LLVMModuleCreateWithNameInContext("factorial", context);
+        LLVMModuleRef module = LLVMModuleCreateWithNameInContext("PINS", context);
         LLVMBuilderRef builder = LLVMCreateBuilderInContext(context);
 
         if (cli.dumpPhases.contains(Phase.IMC)) {
             var LLVMCodeGenerator = new LLVMCodeGenerator(context, module, builder, types);
             ast.accept(LLVMCodeGenerator);
 
-            if (LLVMVerifyModule(module, LLVMPrintMessageAction, error) != 0) {
-                LLVMDisposeMessage(error);
-                return;
-            }
-
-            LLVMPassManagerRef pm = LLVMCreatePassManager();
-            LLVMRunPassManager(pm, module);
-            LLVMDumpModule(module);
+           if (LLVMVerifyModule(module, LLVMPrintMessageAction, error) != 0) {
+               LLVMDisposeMessage(error);
+               return;
+           }
         }
 
-        /**
-         * Izvedi analizo klicnih zapisov in dostopov.
-         */
-        var frames = new NodeDescription<Frame>();
-        var accesses = new NodeDescription<Access>();
-        var frameEvaluator = new FrameEvaluator(frames, accesses, definitions, types);
-        ast.accept(frameEvaluator);
-        if (cli.dumpPhases.contains(Phase.FRM)) {
-            prettyPrint.definitions = Optional.of(definitions);
-            prettyPrint.types = Optional.of(types);
-            prettyPrint.frames = Optional.of(frames);
-            prettyPrint.accesses = Optional.of(accesses);
-            ast.accept(prettyPrint);
-        }
-        if (cli.execPhase == Phase.FRM) {
+        LLVMPassManagerRef pm = LLVMCreatePassManager();
+        LLVMRunPassManager(pm, module);
+        LLVMDumpModule(module);
+
+        LLVMExecutionEngineRef engine = new LLVMExecutionEngineRef();
+        if (LLVMCreateInterpreterForModule(engine, module, error) != 0) {
+            System.err.println("Failed to create LLVM interpreter: " + error.getString());
+            LLVMDisposeMessage(error);
             return;
         }
-        /**
-         * Generiranje vmesne kode.
-         */
-        var generator = new IRCodeGenerator(new NodeDescription<>(), frames, accesses, definitions, types);
-        ast.accept(generator);
-        if (cli.dumpPhases.contains(Phase.IMC)) {
-            new IRPrettyPrint(System.out, 2).print(generator.chunks);
-        }
-        if (cli.execPhase == Phase.IMC) {
-            return;
-        }
-        /**
-         * Linearizacija vmesne kode.
-         */
-        var memory = new Memory(cli.memory);
-        var mainCodeChunk = new LinCodeGenerator(memory).generateCode(generator.chunks);
-        if (!cli.dumpPhases.contains(Phase.INT)) {
-            return;
-        }
-        /**
-         * Izvajanje vmesne kode.
-         */
-        if (mainCodeChunk.isPresent()) {
-            Optional<PrintStream> outputStream = cli.dumpPhases.contains(Phase.INT) ? Optional.of(System.out)
-                    : Optional.empty();
-            var interpreter = new Interpreter(memory, outputStream);
-            interpreter.interpret(mainCodeChunk.get());
-        }
+
+        var mainArgument = LLVMCreateGenericValueOfInt(LLVMInt32TypeInContext(context), 1, 0);
+        LLVMGenericValueRef mainResult = LLVMRunFunction(engine, LLVMGetNamedFunction(module, "main"), 1, mainArgument);
+        System.out.println();
+        System.out.println("; Running main(1) with LLVM interpreter...");
+        System.out.println("; Result: " + LLVMGenericValueToInt(mainResult, /* signExtend */ 0));
+
+        // Stage 6: Dispose of the allocated resources
+        LLVMDisposeExecutionEngine(engine);
+        LLVMDisposePassManager(pm);
+        LLVMDisposeBuilder(builder);
+        LLVMContextDispose(context);
     }
 }
