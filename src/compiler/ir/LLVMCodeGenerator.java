@@ -74,13 +74,17 @@ public class LLVMCodeGenerator implements Visitor {
      */
     public HashMap<String, LLVMValueRef> NamedValues;
 
-    public LLVMCodeGenerator(LLVMContextRef context, LLVMModuleRef module, LLVMBuilderRef builder, NodeDescription<Type> types) {
+    public HashMap<String, LLVMTypeRef> functionTypes;
+
+    public LLVMCodeGenerator(LLVMContextRef context, LLVMModuleRef module, LLVMBuilderRef builder,
+            NodeDescription<Type> types) {
         this.context = context;
         this.module = module;
         this.builder = builder;
         this.types = types;
         this.IRNodes = new NodeDescription<LLVMValueRef>();
         this.NamedValues = new HashMap<String, LLVMValueRef>();
+        this.functionTypes = new HashMap<>();
     }
 
     @Override
@@ -94,11 +98,13 @@ public class LLVMCodeGenerator implements Visitor {
         var arguments = new PointerPointer<>(calledFunctionParameterSize);
 
         IntStream.range(0, calledFunctionParameterSize).forEach(i -> {
-            IRNodes.valueFor(call.arguments.get(i)).ifPresent(value -> arguments.put(i, value));
+            IRNodes.valueFor(call.arguments.get(i)).ifPresent(value -> {
+                arguments.put(i, value);
+            });
         });
 
-        LLVMBuildCall2(builder, LLVMTypeOf(calledFunction), calledFunction, arguments, calledFunctionParameterSize,
-                call.name);
+        IRNodes.store(LLVMBuildCall2(builder, functionTypes.get(call.name), calledFunction, arguments,
+                calledFunctionParameterSize, call.name), call);
     }
 
     @Override
@@ -110,15 +116,20 @@ public class LLVMCodeGenerator implements Visitor {
         var right = IRNodes.valueFor(binary.right).get();
 
         if (binary.operator.equals(Binary.Operator.ASSIGN)) {
-            LLVMBuildStore(builder, right, left);
+            IRNodes.store(LLVMBuildStore(builder, right, left), binary);
         } else if (binary.operator.equals(Binary.Operator.ADD)) {
-            LLVMBuildAdd(builder, left, right, "Add");
+            IRNodes.store(LLVMBuildAdd(builder, left, right, "Add"), binary);
+        }
+        else if(binary.operator.equals(Binary.Operator.SUB)){
+            IRNodes.store(LLVMBuildSub(builder, left, right, "Sub"), binary);
         }
     }
 
     @Override
     public void visit(Block block) {
         block.expressions.forEach(expr -> expr.accept(this));
+        var lastExpression = IRNodes.valueFor(block.expressions.getLast()).get();
+        IRNodes.store(lastExpression, block);
     }
 
     @Override
@@ -129,6 +140,7 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(Name name) {
+        IRNodes.store(NamedValues.get(name.name), name);
     }
 
     @Override
@@ -141,7 +153,8 @@ public class LLVMCodeGenerator implements Visitor {
     public void visit(Literal literal) {
         types.valueFor(literal).ifPresent(type -> {
             if (type.isInt())
-                IRNodes.store(LLVMConstInt(LLVMInt32Type(), Integer.parseInt(literal.value), 0), literal);
+                IRNodes.store(LLVMConstInt(LLVMInt32TypeInContext(context), Integer.parseInt(literal.value), 0),
+                        literal);
             else if (type.isLog())
                 IRNodes.store(LLVMConstInt(LLVMInt1Type(), literal.value.equals("true") ? 1 : 0, 0), literal);
             else if (type.isStr())
@@ -165,6 +178,8 @@ public class LLVMCodeGenerator implements Visitor {
     public void visit(Where where) {
         where.defs.accept(this);
         where.expr.accept(this);
+        var whereReturn = IRNodes.valueFor(where.expr).get();
+        IRNodes.store(whereReturn, where);
     }
 
     @Override
@@ -185,26 +200,28 @@ public class LLVMCodeGenerator implements Visitor {
             });
         });
 
-        LLVMTypeRef functionType = null;
-        var funDefType = types.valueFor(funDef.type);
-        if (funDefType.isPresent()) {
-            functionType = LLVMFunctionType(LLVMInt32TypeInContext(context), parameterTypes, funDef.parameters.size(),
-                    0);
-        } else {
-            Report.error("Napaka pri kreiranju funkcije");
-        }
+        var functionType = LLVMFunctionType(LLVMInt32TypeInContext(context), parameterTypes, funDef.parameters.size(),
+                0);
 
+        functionTypes.put(funDef.name, functionType);
         var function = LLVMAddFunction(module, funDef.name, functionType);
 
-        IRNodes.store(function, funDef);
-
-        LLVMCreateBasicBlockInContext(context, "entry");
+        var entry = LLVMAppendBasicBlockInContext(context, function, "entry");
+        LLVMPositionBuilderAtEnd(builder, entry);
 
         NamedValues.clear();
 
-        funDef.parameters.forEach(parameter -> parameter.accept(this));
+        IntStream.range(0, funDef.parameters.size()).forEach(i -> {
+            var parameter = funDef.parameters.get(i);
+            NamedValues.put(parameter.name, LLVMGetParam(function, i));
+        });
 
         funDef.body.accept(this);
+        var returnedValue = IRNodes.valueFor(funDef.body).get();
+        LLVMBuildRet(builder, returnedValue);
+
+        if (LLVMVerifyFunction(function, LLVMPrintMessageAction) > 0)
+            Report.error("Napačno zgrajena funkcija " + funDef.name + "!");
     }
 
     @Override
@@ -215,16 +232,11 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(VarDef varDef) {
-        types.valueFor(varDef.type).ifPresent(type -> {
-            // IRNodes.store(LLVMBuildAlloca(builder, LLVMInt32Type(), varDef.name),
-            // varDef);
-            NamedValues.put(varDef.name, LLVMBuildAlloca(builder, LLVMInt32Type(), varDef.name));
-        });
+        NamedValues.put(varDef.name, LLVMBuildAlloca(builder, LLVMInt32TypeInContext(context), varDef.name));
     }
 
     @Override
     public void visit(Parameter parameter) {
-        NamedValues.put(parameter.name, LLVMBuildAlloca(builder, LLVMInt32TypeInContext(context), parameter.name));
     }
 
     @Override
