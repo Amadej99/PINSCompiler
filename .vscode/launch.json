@@ -1,5 +1,13 @@
 {
   "configurations": [
+
+    {
+      "type": "java",
+      "name": "Main",
+      "request": "launch",
+      "mainClass": "Main",
+      "projectName": "pinscompiler_85901217"
+    },
     {
       "type": "java",
       "name": "Main",
@@ -12,15 +20,15 @@
       "name": "INT",
       "request": "launch",
       "mainClass": "Main",
-      "projectName": "PINSCompiler_e4e36e37",
-      "args": "PINS pins.txt --dump INT --exec INT"
+      "projectName": "PINSCompiler",
+      "args": "PINS add.txt --dump INT --exec INT"
     },
     {
       "type": "java",
       "name": "IMC",
       "request": "launch",
       "mainClass": "Main",
-      "projectName": "PINSCompiler_e4e36e37",
+      "projectName": "pinscompiler",
       "args": "PINS add.txt --dump IMC --exec IMC"
     },
     {
