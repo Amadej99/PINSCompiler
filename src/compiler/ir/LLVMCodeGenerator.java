@@ -65,17 +65,27 @@ public class LLVMCodeGenerator implements Visitor {
     public NodeDescription<Type> types;
 
     /**
-     * 
+     * Preslikava AST vozlišče -> LLVMValueRef
      */
     public NodeDescription<LLVMValueRef> IRNodes;
 
     /**
-     *
+     * 
      */
     public HashMap<String, LLVMValueRef> NamedValues;
 
+    /**
+     * 
+     */
     public HashMap<String, LLVMTypeRef> functionTypes;
 
+    /**
+     * 
+     * @param context
+     * @param module
+     * @param builder
+     * @param types
+     */
     public LLVMCodeGenerator(LLVMContextRef context, LLVMModuleRef module, LLVMBuilderRef builder,
             NodeDescription<Type> types) {
         this.context = context;
@@ -119,8 +129,7 @@ public class LLVMCodeGenerator implements Visitor {
             IRNodes.store(LLVMBuildStore(builder, right, left), binary);
         } else if (binary.operator.equals(Binary.Operator.ADD)) {
             IRNodes.store(LLVMBuildAdd(builder, left, right, "Add"), binary);
-        }
-        else if(binary.operator.equals(Binary.Operator.SUB)){
+        } else if (binary.operator.equals(Binary.Operator.SUB)) {
             IRNodes.store(LLVMBuildSub(builder, left, right, "Sub"), binary);
         }
     }
@@ -164,8 +173,20 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(Unary unary) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        unary.expr.accept(this);
+        IRNodes.valueFor(unary.expr).ifPresent(value -> {
+            if (unary.operator.equals(Unary.Operator.ADD))
+                IRNodes.store(value, unary);
+            else if (unary.operator.equals(Unary.Operator.SUB)) {
+                IRNodes.store(
+                        LLVMBuildSub(builder, LLVMConstInt(LLVMInt32TypeInContext(context), 0, 1), value, "-Value"),
+                        unary);
+            } else if (unary.operator.equals(Unary.Operator.NOT)) {
+                IRNodes.store(
+                        LLVMBuildSub(builder, LLVMConstInt(LLVMInt32TypeInContext(context), 1, 1), value, "!Value"),
+                        unary);
+            }
+        });
     }
 
     @Override
