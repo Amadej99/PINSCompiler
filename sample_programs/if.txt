@@ -1,0 +1,10 @@
+fun onlyIf ( x : integer ) : integer = (
+    { z = 50},
+    { if (x == 0) then { z = 1 }},
+    z
+) { where var z : integer };
+
+fun main ( argc : integer ) : integer = (
+    { x = 0 },
+    onlyIf(x)
+) { where var x : integer }
