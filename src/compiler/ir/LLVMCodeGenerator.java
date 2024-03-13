@@ -122,9 +122,10 @@ public class LLVMCodeGenerator implements Visitor {
         if (binary.operator.equals(Binary.Operator.ASSIGN)) {
             if ((binary.left instanceof Name name)) {
                 binary.right.accept(this);
-                var right = IRNodes.valueFor(binary.right);
+                var right = IRNodes.valueFor(binary.right).get();
                 var address = NamedValues.get(name.name);
-                IRNodes.store(LLVMBuildStore(builder, right.get(), address), binary);
+                LLVMBuildStore(builder, right, address);
+                IRNodes.store(right, binary);
                 return;
 
             } else
