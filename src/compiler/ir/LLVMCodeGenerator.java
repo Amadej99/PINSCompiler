@@ -119,6 +119,18 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(Binary binary) {
+        if (binary.operator.equals(Binary.Operator.ASSIGN)) {
+            if ((binary.left instanceof Name name)) {
+                binary.right.accept(this);
+                var right = IRNodes.valueFor(binary.right);
+                var address = NamedValues.get(name.name);
+                IRNodes.store(LLVMBuildStore(builder, right.get(), address), binary);
+                return;
+
+            } else
+                Report.error("Leva stran operacije prirejanja mora biti spremenljivka!");
+        }
+
         binary.left.accept(this);
         binary.right.accept(this);
 
@@ -149,7 +161,8 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(Name name) {
-        IRNodes.store(NamedValues.get(name.name), name);
+        var alloca = NamedValues.get(name.name);
+        IRNodes.store(LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), alloca, name.name), name);
     }
 
     @Override
@@ -234,7 +247,9 @@ public class LLVMCodeGenerator implements Visitor {
 
         IntStream.range(0, funDef.parameters.size()).forEach(i -> {
             var parameter = funDef.parameters.get(i);
-            NamedValues.put(parameter.name, LLVMGetParam(function, i));
+            var alloca = LLVMBuildAlloca(builder, LLVMInt32TypeInContext(context), parameter.name);
+            LLVMBuildStore(builder, LLVMGetParam(function, i), alloca);
+            NamedValues.put(parameter.name, alloca);
         });
 
         funDef.body.accept(this);

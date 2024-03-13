@@ -7,6 +7,6 @@ fun sub( a : integer, b : integer ) : integer = (
 );
 
 fun main ( argc : integer ) : integer = (
-    add(300, 20),
-    sub(100, 10)
-)
+    { x = 5 }, { y = 10 },
+    add(x, y)
+) { where var x : integer; var y : integer }
