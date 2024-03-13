@@ -137,12 +137,16 @@ public class LLVMCodeGenerator implements Visitor {
         var left = IRNodes.valueFor(binary.left).get();
         var right = IRNodes.valueFor(binary.right).get();
 
-        if (binary.operator.equals(Binary.Operator.ASSIGN)) {
-            IRNodes.store(LLVMBuildStore(builder, right, left), binary);
-        } else if (binary.operator.equals(Binary.Operator.ADD)) {
-            IRNodes.store(LLVMBuildAdd(builder, left, right, "Add"), binary);
+        if (binary.operator.equals(Binary.Operator.ADD)) {
+            IRNodes.store(LLVMBuildAdd(builder, left, right, "add"), binary);
         } else if (binary.operator.equals(Binary.Operator.SUB)) {
-            IRNodes.store(LLVMBuildSub(builder, left, right, "Sub"), binary);
+            IRNodes.store(LLVMBuildSub(builder, left, right, "sub"), binary);
+        } else if (binary.operator.equals(Binary.Operator.MUL)) {
+            IRNodes.store(LLVMBuildMul(builder, left, right, "mul"), binary);
+        } else if (binary.operator.equals(Binary.Operator.DIV)) {
+            throw new UnsupportedOperationException("Unimplemented div!");
+        } else if (binary.operator.equals(Binary.Operator.EQ)) {
+            IRNodes.store(LLVMBuildICmp(builder, LLVMIntEQ, left, right, "cmpInt"), binary);
         }
     }
 
@@ -167,8 +171,47 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(IfThenElse ifThenElse) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        ifThenElse.condition.accept(this);
+
+        var condition = IRNodes.valueFor(ifThenElse.condition).get();
+
+        var currentBlock = LLVMGetInsertBlock(builder);
+        var currentFunction = LLVMGetBasicBlockParent(currentBlock);
+
+        var thenBlock = LLVMAppendBasicBlockInContext(context, currentFunction, "then");
+        var elseBlock = LLVMCreateBasicBlockInContext(context, "else");
+        var exitBlock = LLVMCreateBasicBlockInContext(context, "exit");
+
+        LLVMBuildCondBr(builder, condition, thenBlock, elseBlock);
+
+        LLVMPositionBuilderAtEnd(builder, thenBlock);
+        ifThenElse.thenExpression.accept(this);
+        LLVMBuildBr(builder, exitBlock);
+        thenBlock = LLVMGetInsertBlock(builder);
+
+        LLVMAppendExistingBasicBlock(currentFunction, elseBlock);
+        LLVMPositionBuilderAtEnd(builder, elseBlock);
+        ifThenElse.elseExpression.ifPresent(expr -> expr.accept(this));
+        LLVMBuildBr(builder, exitBlock);
+        elseBlock = LLVMGetInsertBlock(builder);
+
+        LLVMAppendExistingBasicBlock(currentFunction, exitBlock);
+        LLVMPositionBuilderAtEnd(builder, exitBlock);
+
+        var phi = LLVMBuildPhi(builder, LLVMInt32TypeInContext(context), "phi");
+        var phiValues = new PointerPointer<>(2);
+        phiValues.put(0, IRNodes.valueFor(ifThenElse.thenExpression).get());
+        ifThenElse.elseExpression
+                .ifPresent(elseExpr -> IRNodes.valueFor(elseExpr).ifPresent(elseValue -> phiValues.put(1, elseValue)));
+
+        var phiBlocks = new PointerPointer<>(2);
+        phiBlocks.put(0, thenBlock);
+        if (ifThenElse.elseExpression.isPresent()) {
+            phiBlocks.put(1, elseBlock);
+        }
+
+        LLVMAddIncoming(phi, phiValues, phiBlocks, ifThenElse.elseExpression.isPresent() ? 2 : 1);
+        IRNodes.store(phi, ifThenElse);
     }
 
     @Override
