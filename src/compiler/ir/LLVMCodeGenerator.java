@@ -183,36 +183,42 @@ public class LLVMCodeGenerator implements Visitor {
         var elseBlock = LLVMCreateBasicBlockInContext(context, "else");
         var exitBlock = LLVMCreateBasicBlockInContext(context, "exit");
 
-        LLVMBuildCondBr(builder, condition, thenBlock, elseBlock);
+        if(ifThenElse.elseExpression.isPresent())
+            LLVMBuildCondBr(builder, condition, thenBlock, elseBlock);
+        else
+            LLVMBuildCondBr(builder, condition, thenBlock, exitBlock);
 
         LLVMPositionBuilderAtEnd(builder, thenBlock);
         ifThenElse.thenExpression.accept(this);
         LLVMBuildBr(builder, exitBlock);
         thenBlock = LLVMGetInsertBlock(builder);
 
-        LLVMAppendExistingBasicBlock(currentFunction, elseBlock);
-        LLVMPositionBuilderAtEnd(builder, elseBlock);
-        ifThenElse.elseExpression.ifPresent(expr -> expr.accept(this));
-        LLVMBuildBr(builder, exitBlock);
-        elseBlock = LLVMGetInsertBlock(builder);
+        if(ifThenElse.elseExpression.isPresent()) {
+            LLVMAppendExistingBasicBlock(currentFunction, elseBlock);
+            LLVMPositionBuilderAtEnd(builder, elseBlock);
+            ifThenElse.elseExpression.ifPresent(expr -> expr.accept(this));
+            LLVMBuildBr(builder, exitBlock);
+            elseBlock = LLVMGetInsertBlock(builder);
+        }
 
         LLVMAppendExistingBasicBlock(currentFunction, exitBlock);
         LLVMPositionBuilderAtEnd(builder, exitBlock);
 
-        var phi = LLVMBuildPhi(builder, LLVMInt32TypeInContext(context), "phi");
-        var phiValues = new PointerPointer<>(2);
-        phiValues.put(0, IRNodes.valueFor(ifThenElse.thenExpression).get());
-        ifThenElse.elseExpression
-                .ifPresent(elseExpr -> IRNodes.valueFor(elseExpr).ifPresent(elseValue -> phiValues.put(1, elseValue)));
+        if(ifThenElse.elseExpression.isPresent()) {
+            var phi = LLVMBuildPhi(builder, LLVMInt32TypeInContext(context), "phi");
+            var phiValues = new PointerPointer<>(2);
+            phiValues.put(0, IRNodes.valueFor(ifThenElse.thenExpression).get());
+            ifThenElse.elseExpression
+                    .ifPresent(elseExpr -> IRNodes.valueFor(elseExpr).ifPresent(elseValue -> phiValues.put(1, elseValue)));
 
-        var phiBlocks = new PointerPointer<>(2);
-        phiBlocks.put(0, thenBlock);
-        if (ifThenElse.elseExpression.isPresent()) {
-            phiBlocks.put(1, elseBlock);
+            var phiBlocks = new PointerPointer<>(2);
+            phiBlocks.put(0, thenBlock);
+            if (ifThenElse.elseExpression.isPresent()) {
+                phiBlocks.put(1, elseBlock);
+            }
+
+            LLVMAddIncoming(phi, phiValues, phiBlocks, ifThenElse.elseExpression.isPresent() ? 2 : 1);
         }
-
-        LLVMAddIncoming(phi, phiValues, phiBlocks, ifThenElse.elseExpression.isPresent() ? 2 : 1);
-        IRNodes.store(phi, ifThenElse);
     }
 
     @Override
