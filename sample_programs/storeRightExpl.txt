@@ -1,0 +1,11 @@
+fun add10(x : integer) : integer = (
+    {z = x + 10}
+) { where var z : integer };
+
+fun main( argc : integer ) : integer = (
+    { x = 22 },
+    {x = add10(x)},
+    x
+) { where var x : integer}
+
+# To je primer, ki dodatno razloži zakaj je pomembno da Store IR vrne value right namesto samega sebe!
