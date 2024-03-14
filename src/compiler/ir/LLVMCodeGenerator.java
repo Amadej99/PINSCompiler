@@ -127,7 +127,6 @@ public class LLVMCodeGenerator implements Visitor {
                 LLVMBuildStore(builder, right, address);
                 IRNodes.store(right, binary);
                 return;
-
             } else
                 Report.error("Leva stran operacije prirejanja mora biti spremenljivka!");
         }
@@ -148,6 +147,16 @@ public class LLVMCodeGenerator implements Visitor {
             throw new UnsupportedOperationException("Unimplemented div!");
         } else if (binary.operator.equals(Binary.Operator.EQ)) {
             IRNodes.store(LLVMBuildICmp(builder, LLVMIntEQ, left, right, "cmpInt"), binary);
+        } else if (binary.operator.equals(Binary.Operator.NEQ)){
+            IRNodes.store(LLVMBuildICmp(builder, LLVMIntNE, left, right, "cmpInt"), binary);
+        } else if (binary.operator.equals(Binary.Operator.LT)){
+            IRNodes.store(LLVMBuildICmp(builder, LLVMIntSLT, left, right, "cmpInt"), binary);
+        } else if (binary.operator.equals(Binary.Operator.LEQ)){
+            IRNodes.store(LLVMBuildICmp(builder, LLVMIntSLE, left, right, "cmpInt"), binary);
+        } else if (binary.operator.equals(Binary.Operator.GT)){
+            IRNodes.store(LLVMBuildICmp(builder, LLVMIntSGT, left, right, "cmpInt"), binary);
+        } else if (binary.operator.equals(Binary.Operator.GEQ)){
+            IRNodes.store(LLVMBuildICmp(builder, LLVMIntSGE, left, right, "cmpInt"), binary);
         }
     }
 
@@ -160,8 +169,47 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(For forLoop) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        // forLoop.counter.accept(this);
+        forLoop.low.accept(this);
+
+        var currentBlock = LLVMGetInsertBlock(builder);
+        var currentFunction = LLVMGetBasicBlockParent(currentBlock);
+        var loop = LLVMCreateBasicBlockInContext(context, "loop");
+
+        var counterAddress = NamedValues.get(forLoop.counter.name);
+        LLVMBuildStore(builder, IRNodes.valueFor(forLoop.low).get(), counterAddress);
+        var counterValue = LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), counterAddress, forLoop.counter.name + " value");
+
+        LLVMPositionBuilderAtEnd(builder, loop);
+        var phi = LLVMBuildPhi(builder, LLVMInt32TypeInContext(context), "loopPhi");
+        var phiValues = new PointerPointer<>();
+        phiValues.put(0, counterValue);
+        var phiBlocks = new PointerPointer<>();
+        phiBlocks.put(0, currentBlock);
+
+        var oldCounterNameValue = NamedValues.get(forLoop.counter.name);
+        NamedValues.remove(forLoop.counter.name);
+        NamedValues.put(forLoop.counter.name, phi);
+
+        forLoop.body.accept(this);
+        forLoop.step.accept(this);
+
+        var nextCounterValue = LLVMBuildAdd(builder, counterValue, IRNodes.valueFor(forLoop.step).get(), "nextValue");
+
+        forLoop.high.accept(this);
+
+        var endForBlock = LLVMGetInsertBlock(builder);
+
+        var afterBlock = LLVMAppendBasicBlock(currentFunction, "afterLoop");
+        LLVMBuildCondBr(builder, IRNodes.valueFor(forLoop.high).get(), loop, afterBlock);
+        LLVMPositionBuilderAtEnd(builder, afterBlock);
+
+        phiValues.put(1, nextCounterValue);
+        phiBlocks.put(1, endForBlock);
+
+        NamedValues.remove(forLoop.counter.name);
+        if(oldCounterNameValue != null)
+            NamedValues.put(forLoop.counter.name, oldCounterNameValue);
     }
 
     @Override
