@@ -169,47 +169,54 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(For forLoop) {
-        // forLoop.counter.accept(this);
         forLoop.low.accept(this);
 
         var currentBlock = LLVMGetInsertBlock(builder);
         var currentFunction = LLVMGetBasicBlockParent(currentBlock);
-        var loop = LLVMCreateBasicBlockInContext(context, "loop");
+        var loop = LLVMAppendBasicBlock(currentFunction, "loop");
 
         var counterAddress = NamedValues.get(forLoop.counter.name);
         LLVMBuildStore(builder, IRNodes.valueFor(forLoop.low).get(), counterAddress);
         var counterValue = LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), counterAddress, forLoop.counter.name + " value");
 
+        LLVMBuildBr(builder, loop);
         LLVMPositionBuilderAtEnd(builder, loop);
         var phi = LLVMBuildPhi(builder, LLVMInt32TypeInContext(context), "loopPhi");
-        var phiValues = new PointerPointer<>();
+        var phiValues = new PointerPointer<>(2);
         phiValues.put(0, counterValue);
-        var phiBlocks = new PointerPointer<>();
+        var phiBlocks = new PointerPointer<>(2);
         phiBlocks.put(0, currentBlock);
 
         var oldCounterNameValue = NamedValues.get(forLoop.counter.name);
         NamedValues.remove(forLoop.counter.name);
-        NamedValues.put(forLoop.counter.name, phi);
+        var phiAddress = LLVMBuildAlloca(builder, LLVMInt32TypeInContext(context), "phiAddress");
+        LLVMBuildStore(builder, phi, phiAddress);
+        NamedValues.put(forLoop.counter.name, phiAddress);
 
         forLoop.body.accept(this);
         forLoop.step.accept(this);
 
-        var nextCounterValue = LLVMBuildAdd(builder, counterValue, IRNodes.valueFor(forLoop.step).get(), "nextValue");
+        var nextCounterValue = LLVMBuildAdd(builder, phi, IRNodes.valueFor(forLoop.step).get(), "nextValue");
 
         forLoop.high.accept(this);
 
         var endForBlock = LLVMGetInsertBlock(builder);
 
         var afterBlock = LLVMAppendBasicBlock(currentFunction, "afterLoop");
-        LLVMBuildCondBr(builder, IRNodes.valueFor(forLoop.high).get(), loop, afterBlock);
+        var condition = LLVMBuildICmp(builder, LLVMIntULT, nextCounterValue, IRNodes.valueFor(forLoop.high).get(), "counter < high");
+        LLVMBuildCondBr(builder, condition, loop, afterBlock);
         LLVMPositionBuilderAtEnd(builder, afterBlock);
 
         phiValues.put(1, nextCounterValue);
         phiBlocks.put(1, endForBlock);
 
+        LLVMAddIncoming(phi, phiValues, phiBlocks, 2);
+
         NamedValues.remove(forLoop.counter.name);
         if(oldCounterNameValue != null)
             NamedValues.put(forLoop.counter.name, oldCounterNameValue);
+
+        IRNodes.store(IRNodes.valueFor(forLoop.body).get(), forLoop);
     }
 
     @Override
