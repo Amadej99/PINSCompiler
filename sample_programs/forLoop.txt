@@ -1,0 +1,10 @@
+fun loop(x : integer) : integer = (
+    { z = 0 },
+    { for i = 0, 10, 1 : { z = z + i }},
+    z) { where var i : integer; var z : integer };
+
+fun main( argc : integer ) : integer = (
+    { x = 5 },
+    {loopResult = loop(5)},
+    loopResult
+) { where var x : integer; var loopResult : integer}
