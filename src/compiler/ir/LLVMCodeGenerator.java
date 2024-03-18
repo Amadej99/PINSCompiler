@@ -34,6 +34,7 @@ import compiler.parser.ast.type.Atom;
 import compiler.parser.ast.type.TypeName;
 import compiler.seman.common.NodeDescription;
 import compiler.seman.type.type.Type;
+
 import java.util.stream.IntStream;
 import java.util.HashMap;
 
@@ -70,24 +71,23 @@ public class LLVMCodeGenerator implements Visitor {
     public NodeDescription<LLVMValueRef> IRNodes;
 
     /**
-     * 
+     *
      */
     public HashMap<String, LLVMValueRef> NamedValues;
 
     /**
-     * 
+     *
      */
     public HashMap<String, LLVMTypeRef> functionTypes;
 
     /**
-     * 
      * @param context
      * @param module
      * @param builder
      * @param types
      */
     public LLVMCodeGenerator(LLVMContextRef context, LLVMModuleRef module, LLVMBuilderRef builder,
-            NodeDescription<Type> types) {
+                             NodeDescription<Type> types) {
         this.context = context;
         this.module = module;
         this.builder = builder;
@@ -147,15 +147,15 @@ public class LLVMCodeGenerator implements Visitor {
             throw new UnsupportedOperationException("Unimplemented div!");
         } else if (binary.operator.equals(Binary.Operator.EQ)) {
             IRNodes.store(LLVMBuildICmp(builder, LLVMIntEQ, left, right, "cmpInt"), binary);
-        } else if (binary.operator.equals(Binary.Operator.NEQ)){
+        } else if (binary.operator.equals(Binary.Operator.NEQ)) {
             IRNodes.store(LLVMBuildICmp(builder, LLVMIntNE, left, right, "cmpInt"), binary);
-        } else if (binary.operator.equals(Binary.Operator.LT)){
+        } else if (binary.operator.equals(Binary.Operator.LT)) {
             IRNodes.store(LLVMBuildICmp(builder, LLVMIntSLT, left, right, "cmpInt"), binary);
-        } else if (binary.operator.equals(Binary.Operator.LEQ)){
+        } else if (binary.operator.equals(Binary.Operator.LEQ)) {
             IRNodes.store(LLVMBuildICmp(builder, LLVMIntSLE, left, right, "cmpInt"), binary);
-        } else if (binary.operator.equals(Binary.Operator.GT)){
+        } else if (binary.operator.equals(Binary.Operator.GT)) {
             IRNodes.store(LLVMBuildICmp(builder, LLVMIntSGT, left, right, "cmpInt"), binary);
-        } else if (binary.operator.equals(Binary.Operator.GEQ)){
+        } else if (binary.operator.equals(Binary.Operator.GEQ)) {
             IRNodes.store(LLVMBuildICmp(builder, LLVMIntSGE, left, right, "cmpInt"), binary);
         }
     }
@@ -213,7 +213,7 @@ public class LLVMCodeGenerator implements Visitor {
         LLVMAddIncoming(phi, phiValues, phiBlocks, 2);
 
         NamedValues.remove(forLoop.counter.name);
-        if(oldCounterNameValue != null)
+        if (oldCounterNameValue != null)
             NamedValues.put(forLoop.counter.name, oldCounterNameValue);
 
         IRNodes.store(IRNodes.valueFor(forLoop.body).get(), forLoop);
@@ -238,7 +238,7 @@ public class LLVMCodeGenerator implements Visitor {
         var elseBlock = LLVMCreateBasicBlockInContext(context, "else");
         var exitBlock = LLVMCreateBasicBlockInContext(context, "exit");
 
-        if(ifThenElse.elseExpression.isPresent())
+        if (ifThenElse.elseExpression.isPresent())
             LLVMBuildCondBr(builder, condition, thenBlock, elseBlock);
         else
             LLVMBuildCondBr(builder, condition, thenBlock, exitBlock);
@@ -248,7 +248,7 @@ public class LLVMCodeGenerator implements Visitor {
         LLVMBuildBr(builder, exitBlock);
         thenBlock = LLVMGetInsertBlock(builder);
 
-        if(ifThenElse.elseExpression.isPresent()) {
+        if (ifThenElse.elseExpression.isPresent()) {
             LLVMAppendExistingBasicBlock(currentFunction, elseBlock);
             LLVMPositionBuilderAtEnd(builder, elseBlock);
             ifThenElse.elseExpression.ifPresent(expr -> expr.accept(this));
@@ -259,7 +259,7 @@ public class LLVMCodeGenerator implements Visitor {
         LLVMAppendExistingBasicBlock(currentFunction, exitBlock);
         LLVMPositionBuilderAtEnd(builder, exitBlock);
 
-        if(ifThenElse.elseExpression.isPresent()) {
+        if (ifThenElse.elseExpression.isPresent()) {
             var phi = LLVMBuildPhi(builder, LLVMInt32TypeInContext(context), "phi");
             var phiValues = new PointerPointer<>(2);
             phiValues.put(0, IRNodes.valueFor(ifThenElse.thenExpression).get());
@@ -309,8 +309,22 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(While whileLoop) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        whileLoop.condition.accept(this);
+
+        var currentBlock = LLVMGetInsertBlock(builder);
+        var currentFunction = LLVMGetBasicBlockParent(currentBlock);
+        var loop = LLVMAppendBasicBlock(currentFunction, "loop");
+        var exit = LLVMCreateBasicBlockInContext(context, "exit");
+
+        LLVMBuildCondBr(builder, IRNodes.valueFor(whileLoop.condition).get(), loop, exit);
+        LLVMPositionBuilderAtEnd(builder, loop);
+        whileLoop.body.accept(this);
+        whileLoop.condition.accept(this);
+        LLVMBuildCondBr(builder, IRNodes.valueFor(whileLoop.condition).get(), loop, exit);
+
+        LLVMAppendExistingBasicBlock(currentFunction, exit);
+        LLVMPositionBuilderAtEnd(builder, exit);
+        IRNodes.store(IRNodes.valueFor(whileLoop.body).get(), whileLoop);
     }
 
     @Override

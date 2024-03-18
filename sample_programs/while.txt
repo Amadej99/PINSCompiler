@@ -1,0 +1,13 @@
+fun while(x : integer) : integer = (
+    { i = 0 },
+    { while i < 10 : (
+        {i = i + 1},
+        {x = x + 10}
+    )},
+    x) { where var i : integer };
+
+fun main( argc : integer ) : integer = (
+    { x = 5 },
+    {x = while(x)},
+    x
+) { where var n : integer; var x : integer}

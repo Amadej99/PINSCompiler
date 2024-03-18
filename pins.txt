@@ -3,8 +3,8 @@ fun power(x : integer, n : integer) : integer = (
     else { z = x * power(x, n - 1)}},
     z) { where var z : integer };
 
-fun main(argc : integer) : integer = (
+fun main( argc : integer ) : integer = (
     { x = 5 }, { n = 3 },
-    print_int(power(x, n)),
+    {x = power(x, n)},
     x
 ) { where var n : integer; var x : integer}
