@@ -128,20 +128,23 @@ public class Main {
         LLVMContextRef context = LLVMContextCreate();
         LLVMModuleRef module = LLVMModuleCreateWithNameInContext("PINS", context);
         LLVMBuilderRef builder = LLVMCreateBuilderInContext(context);
-
-        if (cli.dumpPhases.contains(Phase.IMC)) {
-            var LLVMCodeGenerator = new LLVMCodeGenerator(context, module, builder, types);
-            ast.accept(LLVMCodeGenerator);
-
-           if (LLVMVerifyModule(module, LLVMPrintMessageAction, error) != 0) {
-               LLVMDisposeMessage(error);
-               return;
-           }
-        }
+        var LLVMCodeGenerator = new LLVMCodeGenerator(context, module, builder, types);
+        ast.accept(LLVMCodeGenerator);
 
         LLVMPassManagerRef pm = LLVMCreatePassManager();
         LLVMRunPassManager(pm, module);
-        LLVMDumpModule(module);
+
+        if (LLVMVerifyModule(module, LLVMPrintMessageAction, error) != 0) {
+            LLVMDisposeMessage(error);
+            return;
+        }
+
+        if (cli.dumpPhases.contains(Phase.IMC)) {
+            LLVMDumpModule(module);
+        }
+        if(cli.execPhase == Phase.IMC){
+            return;
+        }
 
         LLVMExecutionEngineRef engine = new LLVMExecutionEngineRef();
         if (LLVMCreateInterpreterForModule(engine, module, error) != 0) {
@@ -152,9 +155,10 @@ public class Main {
 
         var mainArgument = LLVMCreateGenericValueOfInt(LLVMInt32TypeInContext(context), 1, 0);
         LLVMGenericValueRef mainResult = LLVMRunFunction(engine, LLVMGetNamedFunction(module, "main"), 1, mainArgument);
-        System.out.println();
-        System.out.println("; Running main(1) with LLVM interpreter...");
-        System.out.println("; Result: " + LLVMGenericValueToInt(mainResult, /* signExtend */ 0));
+        if(cli.dumpPhases.contains(Phase.INT)){
+            System.out.println("Running main(1) with LLVM interpreter...");
+            System.out.println("Result: " + LLVMGenericValueToInt(mainResult, /* signExtend */ 0));
+        }
 
         // Stage 6: Dispose of the allocated resources
         LLVMDisposeExecutionEngine(engine);
