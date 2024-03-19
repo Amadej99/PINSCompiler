@@ -144,19 +144,25 @@ public class LLVMCodeGenerator implements Visitor {
         } else if (binary.operator.equals(Binary.Operator.MUL)) {
             IRNodes.store(LLVMBuildMul(builder, left, right, "mul"), binary);
         } else if (binary.operator.equals(Binary.Operator.DIV)) {
-            throw new UnsupportedOperationException("Unimplemented div!");
-        } else if (binary.operator.equals(Binary.Operator.EQ)) {
-            IRNodes.store(LLVMBuildICmp(builder, LLVMIntEQ, left, right, "cmpInt"), binary);
+            IRNodes.store(LLVMBuildUDiv(builder, left, right, "div"), binary);
+        } else if (binary.operator.equals(Binary.Operator.MOD)) {
+            IRNodes.store(LLVMBuildURem(builder, left, right, "mod"), binary);
+        }  else if (binary.operator.equals(Binary.Operator.EQ)) {
+            IRNodes.store(LLVMBuildICmp(builder, LLVMIntEQ, left, right, "eq"), binary);
         } else if (binary.operator.equals(Binary.Operator.NEQ)) {
-            IRNodes.store(LLVMBuildICmp(builder, LLVMIntNE, left, right, "cmpInt"), binary);
+            IRNodes.store(LLVMBuildICmp(builder, LLVMIntNE, left, right, "neq"), binary);
         } else if (binary.operator.equals(Binary.Operator.LT)) {
-            IRNodes.store(LLVMBuildICmp(builder, LLVMIntSLT, left, right, "cmpInt"), binary);
+            IRNodes.store(LLVMBuildICmp(builder, LLVMIntSLT, left, right, "lt"), binary);
         } else if (binary.operator.equals(Binary.Operator.LEQ)) {
-            IRNodes.store(LLVMBuildICmp(builder, LLVMIntSLE, left, right, "cmpInt"), binary);
+            IRNodes.store(LLVMBuildICmp(builder, LLVMIntSLE, left, right, "leq"), binary);
         } else if (binary.operator.equals(Binary.Operator.GT)) {
-            IRNodes.store(LLVMBuildICmp(builder, LLVMIntSGT, left, right, "cmpInt"), binary);
+            IRNodes.store(LLVMBuildICmp(builder, LLVMIntSGT, left, right, "gt"), binary);
         } else if (binary.operator.equals(Binary.Operator.GEQ)) {
-            IRNodes.store(LLVMBuildICmp(builder, LLVMIntSGE, left, right, "cmpInt"), binary);
+            IRNodes.store(LLVMBuildICmp(builder, LLVMIntSGE, left, right, "geq"), binary);
+        } else if(binary.operator.equals(Binary.Operator.AND)){ 
+            IRNodes.store(LLVMBuildAnd(builder, left, right, "and"), binary);
+        } else if(binary.operator.equals(Binary.Operator.OR)){ 
+            IRNodes.store(LLVMBuildOr(builder, left, right, "or"), binary);
         }
     }
 
