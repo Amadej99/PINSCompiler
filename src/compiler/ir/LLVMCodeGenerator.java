@@ -87,7 +87,7 @@ public class LLVMCodeGenerator implements Visitor {
      * @param types
      */
     public LLVMCodeGenerator(LLVMContextRef context, LLVMModuleRef module, LLVMBuilderRef builder,
-                             NodeDescription<Type> types) {
+            NodeDescription<Type> types) {
         this.context = context;
         this.module = module;
         this.builder = builder;
@@ -147,7 +147,7 @@ public class LLVMCodeGenerator implements Visitor {
             IRNodes.store(LLVMBuildUDiv(builder, left, right, "div"), binary);
         } else if (binary.operator.equals(Binary.Operator.MOD)) {
             IRNodes.store(LLVMBuildURem(builder, left, right, "mod"), binary);
-        }  else if (binary.operator.equals(Binary.Operator.EQ)) {
+        } else if (binary.operator.equals(Binary.Operator.EQ)) {
             IRNodes.store(LLVMBuildICmp(builder, LLVMIntEQ, left, right, "eq"), binary);
         } else if (binary.operator.equals(Binary.Operator.NEQ)) {
             IRNodes.store(LLVMBuildICmp(builder, LLVMIntNE, left, right, "neq"), binary);
@@ -159,9 +159,9 @@ public class LLVMCodeGenerator implements Visitor {
             IRNodes.store(LLVMBuildICmp(builder, LLVMIntSGT, left, right, "gt"), binary);
         } else if (binary.operator.equals(Binary.Operator.GEQ)) {
             IRNodes.store(LLVMBuildICmp(builder, LLVMIntSGE, left, right, "geq"), binary);
-        } else if(binary.operator.equals(Binary.Operator.AND)){ 
+        } else if (binary.operator.equals(Binary.Operator.AND)) {
             IRNodes.store(LLVMBuildAnd(builder, left, right, "and"), binary);
-        } else if(binary.operator.equals(Binary.Operator.OR)){ 
+        } else if (binary.operator.equals(Binary.Operator.OR)) {
             IRNodes.store(LLVMBuildOr(builder, left, right, "or"), binary);
         }
     }
@@ -183,7 +183,8 @@ public class LLVMCodeGenerator implements Visitor {
 
         var counterAddress = NamedValues.get(forLoop.counter.name);
         LLVMBuildStore(builder, IRNodes.valueFor(forLoop.low).get(), counterAddress);
-        var counterValue = LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), counterAddress, forLoop.counter.name + " value");
+        var counterValue = LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), counterAddress,
+                forLoop.counter.name + " value");
 
         LLVMBuildBr(builder, loop);
         LLVMPositionBuilderAtEnd(builder, loop);
@@ -209,7 +210,8 @@ public class LLVMCodeGenerator implements Visitor {
         var endForBlock = LLVMGetInsertBlock(builder);
 
         var afterBlock = LLVMAppendBasicBlock(currentFunction, "afterLoop");
-        var condition = LLVMBuildICmp(builder, LLVMIntULT, nextCounterValue, IRNodes.valueFor(forLoop.high).get(), "counter < high");
+        var condition = LLVMBuildICmp(builder, LLVMIntULT, nextCounterValue, IRNodes.valueFor(forLoop.high).get(),
+                "counter < high");
         LLVMBuildCondBr(builder, condition, loop, afterBlock);
         LLVMPositionBuilderAtEnd(builder, afterBlock);
 
@@ -228,7 +230,15 @@ public class LLVMCodeGenerator implements Visitor {
     @Override
     public void visit(Name name) {
         var alloca = NamedValues.get(name.name);
-        IRNodes.store(LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), alloca, name.name), name);
+
+        types.valueFor(name).ifPresent(type -> {
+            if (type.isInt())
+                IRNodes.store(LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), alloca, name.name), name);
+            else if (type.isLog())
+                IRNodes.store(LLVMBuildLoad2(builder, LLVMInt1TypeInContext(context), alloca, name.name), name);
+            else if (type.isStr())
+                IRNodes.store(LLVMBuildLoad2(builder, LLVMPointerTypeInContext(context, 0), alloca, name.name), name);
+        });
     }
 
     @Override
@@ -270,7 +280,8 @@ public class LLVMCodeGenerator implements Visitor {
             var phiValues = new PointerPointer<>(2);
             phiValues.put(0, IRNodes.valueFor(ifThenElse.thenExpression).get());
             ifThenElse.elseExpression
-                    .ifPresent(elseExpr -> IRNodes.valueFor(elseExpr).ifPresent(elseValue -> phiValues.put(1, elseValue)));
+                    .ifPresent(
+                            elseExpr -> IRNodes.valueFor(elseExpr).ifPresent(elseValue -> phiValues.put(1, elseValue)));
 
             var phiBlocks = new PointerPointer<>(2);
             phiBlocks.put(0, thenBlock);
@@ -290,8 +301,13 @@ public class LLVMCodeGenerator implements Visitor {
                         literal);
             else if (type.isLog())
                 IRNodes.store(LLVMConstInt(LLVMInt1Type(), literal.value.equals("true") ? 1 : 0, 0), literal);
-            else if (type.isStr())
-                IRNodes.store(LLVMConstString(literal.value, literal.value.length(), 0), literal);
+            else if (type.isStr()) {
+                var string = LLVMBuildGlobalStringPtr(builder, literal.value, ".string");
+                var indices = new PointerPointer<>(1).put(0, LLVMConstInt(LLVMInt64TypeInContext(context), 0, 0));
+                var gep = LLVMBuildInBoundsGEP2(builder, LLVMPointerTypeInContext(context, 0), string, indices, 1,
+                        "str");
+                IRNodes.store(gep, literal);
+            }
         });
     }
 
@@ -306,9 +322,7 @@ public class LLVMCodeGenerator implements Visitor {
                         LLVMBuildSub(builder, LLVMConstInt(LLVMInt32TypeInContext(context), 0, 1), value, "-Value"),
                         unary);
             } else if (unary.operator.equals(Unary.Operator.NOT)) {
-                IRNodes.store(
-                        LLVMBuildSub(builder, LLVMConstInt(LLVMInt32TypeInContext(context), 1, 1), value, "!Value"),
-                        unary);
+                IRNodes.store(LLVMBuildNeg(builder, value, "!Value"), unary);
             }
         });
     }
@@ -355,11 +369,23 @@ public class LLVMCodeGenerator implements Visitor {
             types.valueFor(parameter.type).ifPresent(type -> {
                 if (type.isInt())
                     parameterTypes.put(i, LLVMInt32TypeInContext(context));
+                else if (type.isLog())
+                    parameterTypes.put(i, LLVMInt1TypeInContext(context));
                 // TODO: Ostali podatkovni tipi.
             });
         });
 
-        var functionType = LLVMFunctionType(LLVMInt32TypeInContext(context), parameterTypes, funDef.parameters.size(),
+        var returnType = types.valueFor(funDef.type).get();
+        LLVMTypeRef LLVMReturnType = null;
+
+        if (returnType.isInt())
+            LLVMReturnType = LLVMInt32TypeInContext(context);
+        else if (returnType.isLog())
+            LLVMReturnType = LLVMInt1TypeInContext(context);
+        else if (returnType.isStr())
+            LLVMReturnType = LLVMPointerTypeInContext(context, 0);
+
+        var functionType = LLVMFunctionType(LLVMReturnType, parameterTypes, funDef.parameters.size(),
                 0);
 
         functionTypes.put(funDef.name, functionType);
@@ -379,6 +405,7 @@ public class LLVMCodeGenerator implements Visitor {
 
         funDef.body.accept(this);
         var returnedValue = IRNodes.valueFor(funDef.body).get();
+        LLVMDisposeMessage(LLVMPrintValueToString(returnedValue));
         LLVMBuildRet(builder, returnedValue);
 
         if (LLVMVerifyFunction(function, LLVMPrintMessageAction) > 0)
@@ -393,7 +420,17 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(VarDef varDef) {
-        NamedValues.put(varDef.name, LLVMBuildAlloca(builder, LLVMInt32TypeInContext(context), varDef.name));
+        types.valueFor(varDef).ifPresent(type -> {
+            if (type.isInt())
+                NamedValues.put(varDef.name, LLVMBuildAlloca(builder, LLVMInt32TypeInContext(context), varDef.name));
+            else if (type.isLog())
+                NamedValues.put(varDef.name, LLVMBuildAlloca(builder, LLVMInt1TypeInContext(context), varDef.name));
+            else if (type.isStr())
+                NamedValues.put(varDef.name,
+                        LLVMBuildAlloca(builder, LLVMPointerTypeInContext(context, 0), varDef.name));
+            // NamedValues.put(varDef.name, LLVMBuildMalloc(builder,
+            // LLVMInt8TypeInContext(context), varDef.name));
+        });
     }
 
     @Override
