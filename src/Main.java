@@ -23,14 +23,6 @@ import org.bytedeco.llvm.LLVM.LLVMPassManagerRef;
 import cli.PINS;
 import cli.PINS.Phase;
 import compiler.common.PrettyPrintVisitor4;
-import compiler.frm.Access;
-import compiler.frm.Frame;
-import compiler.frm.FrameEvaluator;
-import compiler.gen.LinCodeGenerator;
-import compiler.gen.Memory;
-import compiler.interpret.Interpreter;
-import compiler.ir.IRCodeGenerator;
-import compiler.ir.IRPrettyPrint;
 import compiler.ir.LLVMCodeGenerator;
 import compiler.lexer.Lexer;
 import compiler.parser.Parser;
@@ -43,6 +35,13 @@ import compiler.seman.type.TypeChecker;
 import compiler.seman.type.type.Type;
 
 public class Main {
+
+    static {
+        System.loadLibrary("PtrToString");
+    }
+
+    public static native String convertPointerToString(long pointer);
+
     /**
      * Metoda, ki izvede celotni proces prevajanja.
      *
@@ -157,7 +156,10 @@ public class Main {
         LLVMGenericValueRef mainResult = LLVMRunFunction(engine, LLVMGetNamedFunction(module, "main"), 1, mainArgument);
         if(cli.dumpPhases.contains(Phase.INT)){
             System.out.println("Running main(1) with LLVM interpreter...");
-            System.out.println("Result: " + LLVMGenericValueToInt(mainResult, /* signExtend */ 0));
+            
+            long returnedStringPointer = LLVMGenericValueToPointer(mainResult).address();
+            String returnedString = convertPointerToString(returnedStringPointer);
+            System.out.println("Returned String: " + returnedString);
         }
 
         // Stage 6: Dispose of the allocated resources
