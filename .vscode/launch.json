@@ -5,15 +5,15 @@
       "name": "INT",
       "request": "launch",
       "mainClass": "Main",
-      "vmArgs": "-Djava.library.path=/home/amadej/pinscompiler/jni",
-      "args": "PINS add.txt --dump INT --exec INT",
+      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
+      "args": "PINS add.txt --dump INT --exec INT"
     },
     {
       "type": "java",
       "name": "IMC",
       "request": "launch",
       "mainClass": "Main",
-      "vmArgs": "-Djava.library.path=/home/amadej/pinscompiler/jni",
+      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
       "args": "PINS add.txt --dump IMC --exec IMC"
     },
     {
@@ -21,7 +21,7 @@
       "name": "TYP",
       "request": "launch",
       "mainClass": "Main",
-      "vmArgs": "-Djava.library.path=/home/amadej/pinscompiler/jni",
+      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
       "args": "PINS add.txt --dump TYP --exec TYP"
     }
   ]

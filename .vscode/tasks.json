@@ -4,7 +4,7 @@
         {
             "label": "Compile JNI",
             "type": "shell",
-            "command": "gcc -I/home/amadej/.jdks/openjdk-21.0.2/include -I/home/amadej/.jdks/openjdk-21.0.2/include/linux -shared -o /home/amadej/pinscompiler/jni/libPtrToString.so -fPIC /home/amadej/pinscompiler/jni/pointerToString.c",
+            "command": "gcc -I/home/amadej/.jdks/openjdk-21.0.2/include -I/home/amadej/.jdks/openjdk-21.0.2/include/linux -shared -o ${workspaceFolder}/libPtrToString.so -fPIC ${workspaceFolder}/jni/pointerToString.c",
             "presentation": {
                 "reveal": "always",
                 "panel": "shared"
