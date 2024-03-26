@@ -156,10 +156,13 @@ public class Main {
         LLVMGenericValueRef mainResult = LLVMRunFunction(engine, LLVMGetNamedFunction(module, "main"), 1, mainArgument);
         if(cli.dumpPhases.contains(Phase.INT)){
             System.out.println("Running main(1) with LLVM interpreter...");
+
+            long returnedInteger = LLVMGenericValueToInt(mainResult, 0);
+            System.out.println("Returned Integer: " + returnedInteger);
             
-            long returnedStringPointer = LLVMGenericValueToPointer(mainResult).address();
-            String returnedString = convertPointerToString(returnedStringPointer);
-            System.out.println("Returned String: " + returnedString);
+            // long returnedStringPointer = LLVMGenericValueToPointer(mainResult).address();
+            // String returnedString = convertPointerToString(returnedStringPointer);
+            // System.out.println("Returned String: " + returnedString);
         }
 
         // Stage 6: Dispose of the allocated resources
