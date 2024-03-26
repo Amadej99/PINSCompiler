@@ -461,6 +461,7 @@ public class LLVMCodeGenerator implements Visitor {
             } else if (type.isStr()) {
                 if (staticLevel == 0) {
                     alloca = LLVMAddGlobal(module, LLVMPointerTypeInContext(context, 0), varDef.name);
+                    LLVMSetInitializer(alloca, LLVMConstNull(LLVMPointerTypeInContext(context, 0)));
                     GlobalValues.put(varDef.name, alloca);
                 } else {
                     alloca = LLVMBuildAlloca(builder, LLVMPointerTypeInContext(context, 0), varDef.name);
