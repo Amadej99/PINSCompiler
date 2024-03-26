@@ -23,6 +23,14 @@
       "mainClass": "Main",
       "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
       "args": "PINS add.txt --dump TYP --exec TYP"
+    },
+    {
+      "type": "java",
+      "name": "AST",
+      "request": "launch",
+      "mainClass": "Main",
+      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
+      "args": "PINS add.txt --dump AST --exec AST"
     }
   ]
 }
