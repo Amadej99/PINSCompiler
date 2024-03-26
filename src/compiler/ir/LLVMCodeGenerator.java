@@ -373,7 +373,22 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(Defs defs) {
-        defs.definitions.forEach(def -> def.accept(this));
+        var currentBlock = LLVMGetInsertBlock(builder);
+
+        // Globalne spremenljivke je treba alocirati najprej, ne glede na to kje v kodi se nahajajo.
+        // Potrebno jih je alocirati le enkrat, na začetku.
+        if(currentBlock == null) {
+            defs.definitions.forEach(def -> {
+                if (def instanceof VarDef) def.accept(this);
+            });
+            defs.definitions.forEach(def -> {
+                if (!(def instanceof VarDef))
+                    def.accept(this);
+            });
+        }
+
+        else
+            defs.definitions.forEach(def -> def.accept(this));
     }
 
     @Override
@@ -419,11 +434,8 @@ public class LLVMCodeGenerator implements Visitor {
             NamedValues.put(parameter.name, alloca);
         });
 
-        staticLevel++;
         funDef.body.accept(this);
-        staticLevel--;
         var returnedValue = IRNodes.valueFor(funDef.body).get();
-        LLVMDisposeMessage(LLVMPrintValueToString(returnedValue));
         LLVMBuildRet(builder, returnedValue);
 
         if (LLVMVerifyFunction(function, LLVMPrintMessageAction) > 0)
@@ -438,10 +450,12 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(VarDef varDef) {
+        var currentBlock = LLVMGetInsertBlock(builder);
+
         types.valueFor(varDef).ifPresent(type -> {
             LLVMValueRef alloca = null;
             if (type.isInt()) {
-                if (staticLevel == 0) {
+                if (currentBlock == null) {
                     alloca = LLVMAddGlobal(module, LLVMInt32TypeInContext(context), varDef.name);
                     LLVMSetInitializer(alloca, LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0));
                     GlobalValues.put(varDef.name, alloca);
@@ -450,7 +464,7 @@ public class LLVMCodeGenerator implements Visitor {
                     NamedValues.put(varDef.name, alloca);
                 }
             } else if (type.isLog()) {
-                if (staticLevel == 0) {
+                if (currentBlock == null) {
                     alloca = LLVMAddGlobal(module, LLVMInt1TypeInContext(context), varDef.name);
                     LLVMSetInitializer(alloca, LLVMConstInt(LLVMInt1TypeInContext(context), 0, 0));
                     GlobalValues.put(varDef.name, alloca);
@@ -459,7 +473,7 @@ public class LLVMCodeGenerator implements Visitor {
                     NamedValues.put(varDef.name, alloca);
                 }
             } else if (type.isStr()) {
-                if (staticLevel == 0) {
+                if (currentBlock == null) {
                     alloca = LLVMAddGlobal(module, LLVMPointerTypeInContext(context, 0), varDef.name);
                     LLVMSetInitializer(alloca, LLVMConstNull(LLVMPointerTypeInContext(context, 0)));
                     GlobalValues.put(varDef.name, alloca);
