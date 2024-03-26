@@ -75,10 +75,14 @@ public class LLVMCodeGenerator implements Visitor {
      */
     public HashMap<String, LLVMValueRef> NamedValues;
 
+    public HashMap<String, LLVMValueRef> GlobalValues;
+
     /**
      *
      */
     public HashMap<String, LLVMTypeRef> functionTypes;
+
+    int staticLevel;
 
     /**
      * @param context
@@ -94,7 +98,9 @@ public class LLVMCodeGenerator implements Visitor {
         this.types = types;
         this.IRNodes = new NodeDescription<LLVMValueRef>();
         this.NamedValues = new HashMap<String, LLVMValueRef>();
+        this.GlobalValues = new HashMap<String, LLVMValueRef>();
         this.functionTypes = new HashMap<>();
+        this.staticLevel = 0;
     }
 
     @Override
@@ -123,7 +129,12 @@ public class LLVMCodeGenerator implements Visitor {
             if ((binary.left instanceof Name name)) {
                 binary.right.accept(this);
                 var right = IRNodes.valueFor(binary.right).get();
-                var address = NamedValues.get(name.name);
+
+                LLVMValueRef address;
+                address = NamedValues.get(name.name);
+                if (address == null)
+                    address = GlobalValues.get(name.name);
+
                 LLVMBuildStore(builder, right, address);
                 IRNodes.store(right, binary);
                 return;
@@ -229,15 +240,20 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(Name name) {
-        var alloca = NamedValues.get(name.name);
+        LLVMValueRef alloca = NamedValues.get(name.name);
+        if (alloca == null)
+            alloca = GlobalValues.get(name.name);
+
+        final LLVMValueRef finalAlloca = alloca; // effectively final variable
 
         types.valueFor(name).ifPresent(type -> {
             if (type.isInt())
-                IRNodes.store(LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), alloca, name.name), name);
+                IRNodes.store(LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), finalAlloca, name.name), name);
             else if (type.isLog())
-                IRNodes.store(LLVMBuildLoad2(builder, LLVMInt1TypeInContext(context), alloca, name.name), name);
+                IRNodes.store(LLVMBuildLoad2(builder, LLVMInt1TypeInContext(context), finalAlloca, name.name), name);
             else if (type.isStr())
-                IRNodes.store(LLVMBuildLoad2(builder, LLVMPointerTypeInContext(context, 0), alloca, name.name), name);
+                IRNodes.store(LLVMBuildLoad2(builder, LLVMPointerTypeInContext(context, 0), finalAlloca, name.name),
+                        name);
         });
     }
 
@@ -403,7 +419,9 @@ public class LLVMCodeGenerator implements Visitor {
             NamedValues.put(parameter.name, alloca);
         });
 
+        staticLevel++;
         funDef.body.accept(this);
+        staticLevel--;
         var returnedValue = IRNodes.valueFor(funDef.body).get();
         LLVMDisposeMessage(LLVMPrintValueToString(returnedValue));
         LLVMBuildRet(builder, returnedValue);
@@ -421,15 +439,34 @@ public class LLVMCodeGenerator implements Visitor {
     @Override
     public void visit(VarDef varDef) {
         types.valueFor(varDef).ifPresent(type -> {
-            if (type.isInt())
-                NamedValues.put(varDef.name, LLVMBuildAlloca(builder, LLVMInt32TypeInContext(context), varDef.name));
-            else if (type.isLog())
-                NamedValues.put(varDef.name, LLVMBuildAlloca(builder, LLVMInt1TypeInContext(context), varDef.name));
-            else if (type.isStr())
-                NamedValues.put(varDef.name,
-                        LLVMBuildAlloca(builder, LLVMPointerTypeInContext(context, 0), varDef.name));
-            // NamedValues.put(varDef.name, LLVMBuildMalloc(builder,
-            // LLVMInt8TypeInContext(context), varDef.name));
+            LLVMValueRef alloca = null;
+            if (type.isInt()) {
+                if (staticLevel == 0) {
+                    alloca = LLVMAddGlobal(module, LLVMInt32TypeInContext(context), varDef.name);
+                    LLVMSetInitializer(alloca, LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0));
+                    GlobalValues.put(varDef.name, alloca);
+                } else {
+                    alloca = LLVMBuildAlloca(builder, LLVMInt32TypeInContext(context), varDef.name);
+                    NamedValues.put(varDef.name, alloca);
+                }
+            } else if (type.isLog()) {
+                if (staticLevel == 0) {
+                    alloca = LLVMAddGlobal(module, LLVMInt1TypeInContext(context), varDef.name);
+                    LLVMSetInitializer(alloca, LLVMConstInt(LLVMInt1TypeInContext(context), 0, 0));
+                    GlobalValues.put(varDef.name, alloca);
+                } else {
+                    alloca = LLVMBuildAlloca(builder, LLVMInt1TypeInContext(context), varDef.name);
+                    NamedValues.put(varDef.name, alloca);
+                }
+            } else if (type.isStr()) {
+                if (staticLevel == 0) {
+                    alloca = LLVMAddGlobal(module, LLVMPointerTypeInContext(context, 0), varDef.name);
+                    GlobalValues.put(varDef.name, alloca);
+                } else {
+                    alloca = LLVMBuildAlloca(builder, LLVMPointerTypeInContext(context, 0), varDef.name);
+                    NamedValues.put(varDef.name, alloca);
+                }
+            }
         });
     }
 
