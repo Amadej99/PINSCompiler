@@ -31,6 +31,22 @@
       "mainClass": "Main",
       "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
       "args": "PINS add.txt --dump AST --exec AST"
+    },
+    {
+      "type": "java",
+      "name": "LEX",
+      "request": "launch",
+      "mainClass": "Main",
+      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
+      "args": "PINS add.txt --dump LEX --exec LEX"
+    },
+    {
+      "type": "java",
+      "name": "SYN",
+      "request": "launch",
+      "mainClass": "Main",
+      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
+      "args": "PINS add.txt --dump SYN --exec SYN"
     }
   ]
 }
