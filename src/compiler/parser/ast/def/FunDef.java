@@ -35,7 +35,6 @@ public class FunDef extends Def {
         super(position, name);
         requireNonNull(parameters);
         requireNonNull(type);
-        requireNonNull(body);
         this.parameters = parameters;
         this.type = type;
         this.body = body;

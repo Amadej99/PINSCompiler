@@ -146,7 +146,8 @@ public class NameChecker implements Visitor {
         // Sprejmi telo funkcije in parametre v novem scope-u
         symbolTable.inNewScope(() -> {
             funDef.parameters.forEach(parameter -> parameter.accept(this));
-            funDef.body.accept(this);
+            if (funDef.body != null)
+                funDef.body.accept(this);
         });
     }
 

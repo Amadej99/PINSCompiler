@@ -99,6 +99,9 @@ public class Parser {
 		} else if (si.getNext().equals(KW_FUN)) {
 			dump("definition -> fun_definition");
 			return parseFunDefinition();
+		} else if (si.getNext().equals(KW_DECLARE)) {
+			dump("definition -> fun_declaration");
+			return parseFunDeclareDefinition();
 		} else {
 			Report.error(si.getSymbol().position, "Pricakoval typ, var ali fun");
 			return null;
@@ -203,6 +206,42 @@ public class Parser {
 				return new VarDef(new Position(startPosition, type.position.end), name, type);
 			} else {
 				Report.error(si.getSymbol().position, "Pricakoval :");
+				return null;
+			}
+		} else {
+			Report.error(si.getSymbol().position, "Pricakoval identifier");
+			return null;
+		}
+	}
+
+	FunDef parseFunDeclareDefinition() {
+		dump("function_declaration -> fun identifier ( parameters ) : type");
+		Symbol start = si.getSymbol();
+		si.skip();
+		if (si.getNext().equals(IDENTIFIER)) {
+			String name = si.getSymbol().lexeme;
+			si.skip();
+			if (si.getNext().equals(OP_LPARENT)) {
+				si.skip();
+				var empty_list = new ArrayList<Parameter>();
+				var params = parseParameters(empty_list);
+				if (si.getNext().equals(OP_RPARENT)) {
+					si.skip();
+					if (si.getNext().equals(OP_COLON)) {
+						si.skip();
+						var type = parseType();
+						return new FunDef(new Position(start.position.start, type.position.end), name, params,
+								type, null);
+					} else {
+						Report.error(si.getSymbol().position, "Pricakoval :");
+						return null;
+					}
+				} else {
+					Report.error(si.getSymbol().position, "Pricakoval (");
+					return null;
+				}
+			} else {
+				Report.error(si.getSymbol().position, "Pricakoval (");
 				return null;
 			}
 		} else {

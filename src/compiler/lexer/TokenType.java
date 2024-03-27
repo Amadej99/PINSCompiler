@@ -24,6 +24,7 @@ public enum TokenType {
     KW_VAR,
     KW_WHERE,
     KW_WHILE,
+    KW_DECLARE,
 
     /**
      * Atomarni podatkovni tipi:

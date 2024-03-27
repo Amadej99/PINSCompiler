@@ -41,12 +41,12 @@ public class PrettyPrintVisitor4 implements Visitor {
     private PrintStream stream;
 
     /**
-     * Razrešena imena. 
+     * Razrešena imena.
      */
     public Optional<NodeDescription<Def>> definitions = Optional.empty();
 
     /**
-     * Razrešeni podatkovni tipi. 
+     * Razrešeni podatkovni tipi.
      */
     public Optional<NodeDescription<Type>> types = Optional.empty();
 
@@ -64,7 +64,7 @@ public class PrettyPrintVisitor4 implements Visitor {
      * Ustvari novo instanco.
      * 
      * @param increaseIndentBy za koliko naj se poveča indentacija pri gnezdenju.
-     * @param stream izhodni tok.
+     * @param stream           izhodni tok.
      */
     public PrettyPrintVisitor4(int increaseIndentBy, PrintStream stream) {
         requireNonNull(stream);
@@ -206,7 +206,8 @@ public class PrettyPrintVisitor4 implements Visitor {
             printFrame(funDef);
             visit(funDef.parameters);
             funDef.type.accept(this);
-            funDef.body.accept(this);
+            if (funDef.body != null)
+                funDef.body.accept(this);
         });
     }
 
@@ -275,7 +276,7 @@ public class PrettyPrintVisitor4 implements Visitor {
             node.accept(this);
         });
     }
-    
+
     // ----------------------------------
 
     /**

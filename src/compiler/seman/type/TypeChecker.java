@@ -372,18 +372,20 @@ public class TypeChecker implements Visitor {
                 () -> Report.error(funDef.type.position, "Napaka v tipih funkcije"));
 
         // Preveri tip telesa funkcije
-        funDef.body.accept(this);
-        types.valueFor(funDef.body).ifPresentOrElse(funBodyType -> {
-            // Preveri tip telesa funkcije
-            types.valueFor(funDef.type).ifPresent(funType -> {
-                // Preveri ali se tipa ujemata
-                if (types.valueFor(funDef.type).get().equals(funBodyType)) {
-                    types.store(new Type.Function(parameterTypes, funType), funDef);
-                    return;
-                } else
-                    Report.error(funDef.type.position, "Neveljaven return type v funkciji!");
-            });
-        }, () -> Report.error(funDef.body.position, "Napaka v body funkcije!"));
+        if (funDef.body != null) {
+            funDef.body.accept(this);
+            types.valueFor(funDef.body).ifPresentOrElse(funBodyType -> {
+                // Preveri tip telesa funkcije
+                types.valueFor(funDef.type).ifPresent(funType -> {
+                    // Preveri ali se tipa ujemata
+                    if (types.valueFor(funDef.type).get().equals(funBodyType)) {
+                        types.store(new Type.Function(parameterTypes, funType), funDef);
+                        return;
+                    } else
+                        Report.error(funDef.type.position, "Neveljaven return type v funkciji!");
+                });
+            }, () -> Report.error(funDef.body.position, "Napaka v body funkcije!"));
+        }
     }
 
     @Override
