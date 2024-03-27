@@ -392,7 +392,9 @@ public class LLVMCodeGenerator implements Visitor {
                     parameterTypes.put(i, LLVMInt32TypeInContext(context));
                 else if (type.isLog())
                     parameterTypes.put(i, LLVMInt1TypeInContext(context));
-                // TODO: Ostali podatkovni tipi.
+                else if (type.isStr()) {
+                    parameterTypes.put(i, LLVMPointerTypeInContext(context, 0));
+                }
             });
         });
 
@@ -406,11 +408,15 @@ public class LLVMCodeGenerator implements Visitor {
         else if (returnType.isStr())
             LLVMReturnType = LLVMPointerTypeInContext(context, 0);
 
+        // TODO: Figure out how to declare VarArg functions (printf).
         var functionType = LLVMFunctionType(LLVMReturnType, parameterTypes, funDef.parameters.size(),
                 0);
 
         functionTypes.put(funDef.name, functionType);
         var function = LLVMAddFunction(module, funDef.name, functionType);
+
+        if (funDef.body == null)
+            return;
 
         var entry = LLVMAppendBasicBlockInContext(context, function, "entry");
         LLVMPositionBuilderAtEnd(builder, entry);
