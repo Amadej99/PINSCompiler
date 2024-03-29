@@ -24,6 +24,7 @@ import compiler.parser.ast.def.FunDef;
 import compiler.parser.ast.def.TypeDef;
 import compiler.parser.ast.def.VarDef;
 import compiler.parser.ast.def.FunDef.Parameter;
+import compiler.parser.ast.def.FunDef.VarArg;
 import compiler.parser.ast.expr.Binary;
 import compiler.parser.ast.expr.Block;
 import compiler.parser.ast.expr.Call;
@@ -223,15 +224,23 @@ public class Parser {
 			si.skip();
 			if (si.getNext().equals(OP_LPARENT)) {
 				si.skip();
+				boolean isVarArg = false;
+				Parameter varArgParam = null;
 				var empty_list = new ArrayList<Parameter>();
 				var params = parseParameters(empty_list);
+				for (Parameter param : params)
+					if (param instanceof VarArg) {
+						isVarArg = true;
+						varArgParam = param;
+					}
+				params.remove(varArgParam);
 				if (si.getNext().equals(OP_RPARENT)) {
 					si.skip();
 					if (si.getNext().equals(OP_COLON)) {
 						si.skip();
 						var type = parseType();
 						return new FunDef(new Position(start.position.start, type.position.end), name, params,
-								type, null);
+								type, null, isVarArg);
 					} else {
 						Report.error(si.getSymbol().position, "Pricakoval :");
 						return null;
@@ -261,6 +270,10 @@ public class Parser {
 				si.skip();
 				var empty_list = new ArrayList<Parameter>();
 				var params = parseParameters(empty_list);
+				params.stream().filter(param -> param instanceof VarArg);
+				for (Parameter param : params)
+					if (param instanceof VarArg)
+						Report.error("Variabilno število argumentov je dovoljeno le pri uvoženih funkcijah: " + name);
 				if (si.getNext().equals(OP_RPARENT)) {
 					si.skip();
 					if (si.getNext().equals(OP_COLON)) {
@@ -270,7 +283,7 @@ public class Parser {
 							si.skip();
 							var expr = parseExpression();
 							return new FunDef(new Position(start.position.start, expr.position.end), name, params,
-									type, expr);
+									type, expr, false);
 						} else {
 							Report.error(si.getSymbol().position, "Pricakoval =");
 							return null;
@@ -313,8 +326,12 @@ public class Parser {
 				Report.error(si.getSymbol().position, "Pricakoval :");
 				return null;
 			}
+		} else if (si.getNext().equals(OP_VARARG)) {
+			Symbol s = si.getSymbol();
+			si.skip();
+			return new VarArg(new Position(s.position.start, s.position.end), "varArg", null);
 		} else {
-			Report.error(si.getSymbol().position, "Pricakoval identifier");
+			Report.error(si.getSymbol().position, "Pricakoval identifier ali ...");
 			return null;
 		}
 	}

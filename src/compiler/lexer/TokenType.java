@@ -74,9 +74,9 @@ public enum TokenType {
 
     OP_COLON, // :
     OP_SEMICOLON, // ;
-    OP_DOT, // .
     OP_COMMA, // ,
     OP_ASSIGN, // =
+    OP_VARARG, // ...
 
     COMMENT
 }

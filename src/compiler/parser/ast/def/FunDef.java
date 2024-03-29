@@ -31,13 +31,19 @@ public class FunDef extends Def {
      */
     public final Expr body;
 
-    public FunDef(Position position, String name, List<Parameter> parameters, Type type, Expr body) {
+    /**
+     * Je funkcija z variabilnim številom parametrov.
+     */
+    public final boolean isVarArg;
+
+    public FunDef(Position position, String name, List<Parameter> parameters, Type type, Expr body, boolean isVarArg) {
         super(position, name);
         requireNonNull(parameters);
         requireNonNull(type);
         this.parameters = parameters;
         this.type = type;
         this.body = body;
+        this.isVarArg = isVarArg;
     }
 
     @Override
@@ -56,13 +62,28 @@ public class FunDef extends Def {
 
         public Parameter(Position position, String name, Type type) {
             super(position, name);
-            requireNonNull(type);
             this.type = type;
         }
 
         @Override
         public void accept(Visitor visitor) {
             visitor.visit(this);
+        }
+    }
+
+    /**
+     * Predstavlja variabilno število parametrov.
+     * Služi le kot indikator, da je število parametrov v funkciji spremenljivo.
+     * Se ne pojavi v končnem AST.
+     */
+    public static class VarArg extends Parameter {
+        public VarArg(Position position, String name, Type type) {
+            super(position, name, type);
+        }
+
+        @Override
+        public void accept(Visitor visitor) {
+            super.accept(visitor);
         }
     }
 }

@@ -233,11 +233,12 @@ public class PrettyPrintVisitor4 implements Visitor {
     @Override
     public void visit(FunDef.Parameter parameter) {
         println("Parameter", parameter, parameter.name);
-        inNewScope(() -> {
-            printTypedAs(parameter);
-            printAccessedAs(parameter);
-            parameter.type.accept(this);
-        });
+        if (parameter.type != null)
+            inNewScope(() -> {
+                printTypedAs(parameter);
+                printAccessedAs(parameter);
+                parameter.type.accept(this);
+            });
     }
 
     // Tipi:

@@ -106,7 +106,12 @@ public class LLVMCodeGenerator implements Visitor {
 
         call.arguments.forEach(argument -> argument.accept(this));
 
-        var calledFunctionParameterSize = LLVMCountParams(calledFunction);
+        var calledFunctionParameterSize = 0;
+
+        if(LLVMIsFunctionVarArg(functionTypes.get(call.name)) == 1)
+            calledFunctionParameterSize = call.arguments.size();
+        else
+            calledFunctionParameterSize = LLVMCountParams(calledFunction);
 
         var arguments = new PointerPointer<>(calledFunctionParameterSize);
 
@@ -410,7 +415,7 @@ public class LLVMCodeGenerator implements Visitor {
 
         // TODO: Figure out how to declare VarArg functions (printf).
         var functionType = LLVMFunctionType(LLVMReturnType, parameterTypes, funDef.parameters.size(),
-                0);
+                funDef.isVarArg ? 1 : 0);
 
         functionTypes.put(funDef.name, functionType);
         var function = LLVMAddFunction(module, funDef.name, functionType);

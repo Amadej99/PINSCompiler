@@ -55,52 +55,6 @@ public class TypeChecker implements Visitor {
             }, () -> Report.error(call.position, "Napacen tip v argumentu!"));
         });
 
-        // Preveri ali je funkcija del standardne knjiznice in jo ustrezno obravnavaj
-        if (Constants.Library.contains(call.name)) {
-            switch (call.name) {
-                case Constants.printStringLabel -> {
-                    if (argumentTypes.size() != 1) {
-                        Report.error(call.position, "Napacno stevilo argumentov!");
-                    }
-                    if (!argumentTypes.get(0).isStr()) {
-                        Report.error(call.position, "Napacen tip argumenta!");
-                    }
-                    types.store(new Type.Atom(Kind.STR), call);
-                    return;
-                }
-                case Constants.printLogLabel -> {
-                    if (argumentTypes.size() != 1) {
-                        Report.error(call.position, "Napacno stevilo argumentov!");
-                    }
-                    if (!argumentTypes.get(0).isLog()) {
-                        Report.error(call.position, "Napacen tip argumenta!");
-                    }
-                    types.store(new Type.Atom(Kind.LOG), call);
-                    return;
-                }
-                case Constants.randIntLabel -> {
-                    if (argumentTypes.size() != 2) {
-                        Report.error(call.position, "Napacno stevilo argumentov!");
-                    }
-                    if (!argumentTypes.get(0).isInt() || !argumentTypes.get(1).isInt()) {
-                        Report.error(call.position, "Napacen tip argumenta!");
-                    }
-                    types.store(new Type.Atom(Kind.INT), call);
-                    return;
-                }
-                default -> {
-                    if (argumentTypes.size() != 1) {
-                        Report.error(call.position, "Napacno stevilo argumentov!");
-                    }
-                    if (!argumentTypes.get(0).isInt()) {
-                        Report.error(call.position, "Napacen tip argumenta!");
-                    }
-                    types.store(new Type.Atom(Kind.INT), call);
-                    return;
-                }
-            }
-        }
-
         // Preveri ali je funkcija definirana
         var def = definitions.valueFor(call);
         if (def.isPresent()) {
@@ -122,7 +76,7 @@ public class TypeChecker implements Visitor {
                 if (asFunc.isPresent()) {
                     var getAsFunc = asFunc.get();
                     // Preveri ali se stevilo argumentov ujema
-                    if (getAsFunc.parameters.size() != argumentTypes.size()) {
+                    if (getAsFunc.parameters.size() != argumentTypes.size() && !getAsFunc.isVarArg) {
                         Report.error(call.position, "Napačno stevilo argumentov!");
                     }
 
@@ -135,7 +89,7 @@ public class TypeChecker implements Visitor {
 
                     // Ustvari tip funkcije z argumenti in vrednostjo, ki jo vrne, da preveris
                     // enakost
-                    var compareFunc = new Type.Function(argumentTypes, getAsFunc.returnType);
+                    var compareFunc = new Type.Function(argumentTypes, getAsFunc.returnType, getAsFunc.isVarArg);
                     if (getAsFunc.equals(compareFunc)) {
                         types.store(getAsFunc.returnType, call);
                         return;
@@ -368,7 +322,7 @@ public class TypeChecker implements Visitor {
 
         // Preveri tip funkcije
         types.valueFor(funDef.type).ifPresentOrElse(
-                type -> types.store(new Type.Function(parameterTypes, type), funDef),
+                type -> types.store(new Type.Function(parameterTypes, type, funDef.isVarArg), funDef),
                 () -> Report.error(funDef.type.position, "Napaka v tipih funkcije"));
 
         // Preveri tip telesa funkcije
@@ -379,7 +333,7 @@ public class TypeChecker implements Visitor {
                 types.valueFor(funDef.type).ifPresent(funType -> {
                     // Preveri ali se tipa ujemata
                     if (types.valueFor(funDef.type).get().equals(funBodyType)) {
-                        types.store(new Type.Function(parameterTypes, funType), funDef);
+                        types.store(new Type.Function(parameterTypes, funType, funDef.isVarArg), funDef);
                         return;
                     } else
                         Report.error(funDef.type.position, "Neveljaven return type v funkciji!");

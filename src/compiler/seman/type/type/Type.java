@@ -233,22 +233,25 @@ public abstract class Type {
          */
         public final Type returnType;
 
-        public Function(List<Type> parameters, Type returnType) {
+        public final boolean isVarArg;
+
+        public Function(List<Type> parameters, Type returnType, boolean isVarArg) {
             requireNonNull(parameters);
             requireNonNull(returnType);
             this.parameters = parameters;
             this.returnType = returnType;
+            this.isVarArg = isVarArg;
         }
 
         @Override
         public int sizeInBytes() {
-            //Ni treba implementirat zares
+            // Ni treba implementirat zares
             return this.parameters.stream().mapToInt(Type::sizeInBytes).sum();
         }
 
         @Override
         public int sizeInBytesAsParam() {
-            //Ni treba implementirat zares
+            // Ni treba implementirat zares
             return Constants.WordSize;
         }
 

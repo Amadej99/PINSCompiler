@@ -50,7 +50,7 @@ public class Lexer {
         keywordMapping.put("string", AT_STRING);
 
         String[] operators = {"+", "-", "*", "/", "%", "&", "|", "!", "==", "!=", "<", ">", "<=", ">=", "(", ")", "[",
-                "]", "{", "}", ":", ";", ".", ",", "="};
+                "]", "{", "}", ":", ";", ",", "=", "..."};
         List<TokenType> otherTokenTypes = new ArrayList<>();
 
         for (var token : TokenType.values()) {
