@@ -311,7 +311,7 @@ public class LLVMCodeGenerator implements Visitor {
             else if (type.isLog())
                 IRNodes.store(LLVMConstInt(LLVMInt1Type(), literal.value.equals("true") ? 1 : 0, 0), literal);
             else if (type.isStr()) {
-                var string = LLVMBuildGlobalStringPtr(builder, literal.value, ".string");
+                var string = LLVMBuildGlobalStringPtr(builder, literal.value.replace("\\n", "\n"), ".string");
                 var indices = new PointerPointer<>(1).put(0, LLVMConstInt(LLVMInt64TypeInContext(context), 0, 0));
                 var gep = LLVMBuildInBoundsGEP2(builder, LLVMPointerTypeInContext(context, 0), string, indices, 1,
                         "str");
@@ -413,7 +413,6 @@ public class LLVMCodeGenerator implements Visitor {
         else if (returnType.isStr())
             LLVMReturnType = LLVMPointerTypeInContext(context, 0);
 
-        // TODO: Figure out how to declare VarArg functions (printf).
         var functionType = LLVMFunctionType(LLVMReturnType, parameterTypes, funDef.parameters.size(),
                 funDef.isVarArg ? 1 : 0);
 
