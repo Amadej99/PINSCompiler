@@ -19,6 +19,7 @@ import org.bytedeco.llvm.LLVM.LLVMExecutionEngineRef;
 import org.bytedeco.llvm.LLVM.LLVMGenericValueRef;
 import org.bytedeco.llvm.LLVM.LLVMModuleRef;
 import org.bytedeco.llvm.LLVM.LLVMPassManagerRef;
+import org.bytedeco.llvm.LLVM.LLVMTargetRef;
 
 import cli.PINS;
 import cli.PINS.Phase;
@@ -123,7 +124,7 @@ public class Main {
             return;
         }
 
-        final BytePointer error = new BytePointer();
+        BytePointer error = new BytePointer();
         LLVMContextRef context = LLVMContextCreate();
         LLVMModuleRef module = LLVMModuleCreateWithNameInContext("PINS", context);
         LLVMBuilderRef builder = LLVMCreateBuilderInContext(context);
@@ -141,7 +142,7 @@ public class Main {
         if (cli.dumpPhases.contains(Phase.IMC)) {
             LLVMDumpModule(module);
         }
-        if(cli.execPhase == Phase.IMC){
+        if (cli.execPhase == Phase.IMC) {
             return;
         }
 
@@ -154,12 +155,41 @@ public class Main {
 
         var mainArgument = LLVMCreateGenericValueOfInt(LLVMInt32TypeInContext(context), 1, 0);
         LLVMGenericValueRef mainResult = LLVMRunFunction(engine, LLVMGetNamedFunction(module, "main"), 1, mainArgument);
-        if(cli.dumpPhases.contains(Phase.INT)){
+
+        LLVMInitializeAllTargetInfos();
+        LLVMInitializeAllTargets();
+        LLVMInitializeAllTargetMCs();
+        LLVMInitializeAllAsmParsers();
+        LLVMInitializeAllAsmPrinters();
+
+        var targetTriple = LLVMGetDefaultTargetTriple();
+
+        // var target = new PointerPointer<LLVMTargetRef>(1);
+
+        LLVMTargetRef target = new LLVMTargetRef();
+        if (LLVMGetTargetFromTriple(targetTriple, target, error) != 0) {
+            System.out.println("Failed to get target: " + error.toString());
+            LLVMDisposeMessage(error);
+            return;
+        }
+
+        var targetMachine = LLVMCreateTargetMachine(target, targetTriple.getString(), "generic", "",
+                LLVMCodeGenLevelNone, 0, LLVMCodeModelDefault);
+        LLVMCreateTargetDataLayout(targetMachine);
+        LLVMSetTarget(module, targetTriple);
+
+        if (LLVMTargetMachineEmitToFile(targetMachine, module, "object.o", 1, error) != 0) {
+            System.err.println("Failed to emit object file!");
+            LLVMDisposeMessage(error);
+            return;
+        }
+
+        if (cli.dumpPhases.contains(Phase.INT)) {
             System.out.println("Running main(1) with LLVM interpreter...");
 
             long returnedInteger = LLVMGenericValueToInt(mainResult, 0);
             System.out.println("Returned Integer: " + returnedInteger);
-            
+
             // long returnedStringPointer = LLVMGenericValueToPointer(mainResult).address();
             // String returnedString = convertPointerToString(returnedStringPointer);
             // System.out.println("Returned String: " + returnedString);
