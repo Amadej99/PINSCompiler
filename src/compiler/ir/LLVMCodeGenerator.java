@@ -108,7 +108,7 @@ public class LLVMCodeGenerator implements Visitor {
 
         var calledFunctionParameterSize = 0;
 
-        if(LLVMIsFunctionVarArg(functionTypes.get(call.name)) == 1)
+        if (LLVMIsFunctionVarArg(functionTypes.get(call.name)) == 1)
             calledFunctionParameterSize = call.arguments.size();
         else
             calledFunctionParameterSize = LLVMCountParams(calledFunction);
@@ -477,6 +477,49 @@ public class LLVMCodeGenerator implements Visitor {
                     LLVMSetInitializer(alloca, LLVMConstNull(LLVMPointerTypeInContext(context, 0)));
                 } else {
                     alloca = LLVMBuildAlloca(builder, LLVMPointerTypeInContext(context, 0), varDef.name);
+                }
+            } else if (type.isArray()) {
+                var asArray = type.asArray().get();
+                var arraySize = asArray.size;
+                var arrayType = asArray.type;
+
+                if (arrayType.isInt()) {
+                    if (currentBlock == null) {
+                        alloca = LLVMAddGlobal(module, LLVMArrayType2(LLVMInt32TypeInContext(context), arraySize),
+                                varDef.name);
+                        var zeroes = new PointerPointer<>(1);
+                        for (int i = 0; i < arraySize; i++) {
+                            zeroes.put(i, LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0));
+                        }
+                        LLVMSetInitializer(alloca, LLVMConstArray2(LLVMInt32TypeInContext(context), zeroes, arraySize));
+                    } else {
+                        alloca = LLVMBuildAlloca(builder, LLVMArrayType2(LLVMInt32TypeInContext(context), arraySize), varDef.name);
+                    }
+                } else if (arrayType.isLog()) {
+                    if(currentBlock == null){
+                    alloca = LLVMAddGlobal(module, LLVMArrayType2(LLVMInt1TypeInContext(context), arraySize),
+                            varDef.name);
+                    var zeroes = new PointerPointer<>(1);
+                    for (int i = 0; i < arraySize; i++) {
+                        zeroes.put(i, LLVMConstInt(LLVMInt1TypeInContext(context), 0, 0));
+                    }
+                    LLVMSetInitializer(alloca, LLVMConstArray2(LLVMInt32TypeInContext(context), zeroes, arraySize));
+                } else {
+                    alloca = LLVMBuildAlloca(builder, LLVMArrayType2(LLVMInt1TypeInContext(context), arraySize), varDef.name);
+                }
+                } else if (arrayType.isStr()) {
+                    if(currentBlock == null){
+                    alloca = LLVMAddGlobal(module, LLVMArrayType2(LLVMPointerTypeInContext(context, 0), arraySize),
+                            varDef.name);
+                    var zeroes = new PointerPointer<>(1);
+                    for (int i = 0; i < arraySize; i++) {
+                        zeroes.put(i, LLVMConstNull(LLVMPointerTypeInContext(context, 0)));
+                    }
+                    LLVMSetInitializer(alloca,
+                            LLVMConstArray2(LLVMPointerTypeInContext(context, 0), zeroes, arraySize));
+                } else {
+                    alloca = LLVMBuildAlloca(builder, LLVMArrayType2(LLVMPointerTypeInContext(context, 0), arraySize), varDef.name);
+                }
                 }
             }
             NamedValues.put(varDef.name, alloca);
