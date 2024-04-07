@@ -175,17 +175,17 @@ public class LLVMCodeGenerator implements Visitor {
                 Report.error("Leva stran operacije prirejanja mora biti spremenljivka!");
         }
 
-        if(binary.operator.equals(Binary.Operator.ARR) && binary.left instanceof Binary){
+        // TODO: Review!
+        if (binary.operator.equals(Binary.Operator.ARR) && binary.left instanceof Binary) {
             binary.right.accept(this);
-        }
-        else{
+        } else {
             binary.left.accept(this);
             binary.right.accept(this);
         }
 
         LLVMValueRef left = null;
 
-        if(!(binary.operator.equals(Binary.Operator.ARR) && binary.left instanceof Binary))
+        if (!(binary.operator.equals(Binary.Operator.ARR) && binary.left instanceof Binary))
             left = IRNodes.valueFor(binary.left).get();
         var right = IRNodes.valueFor(binary.right).get();
 
@@ -250,6 +250,14 @@ public class LLVMCodeGenerator implements Visitor {
         } else
             return LLVMArrayType2(resolveArrayType(type.asArray().get().type.asArray().get()),
                     type.asArray().get().size);
+    }
+
+    private LLVMTypeRef resolveInnerArrayType(Type type) {
+        if (!type.asArray().get().type.isArray()) {
+            return LLVMInt32TypeInContext(context);
+        } else
+            return LLVMArrayType2(resolveInnerArrayType(type.asArray().get().type.asArray().get()),
+                    type.asArray().get().type.asArray().get().size);
     }
 
     private void resolveArrayIndeces(Binary binary, List<Pointer> indeces) {
@@ -546,7 +554,6 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(VarDef varDef) {
-        // TODO: Inicializiraj globalne sezname!
         var currentBlock = LLVMGetInsertBlock(builder);
 
         types.valueFor(varDef).ifPresent(type -> {
@@ -575,22 +582,19 @@ public class LLVMCodeGenerator implements Visitor {
             } else if (type.isArray()) {
                 var asArray = type.asArray().get();
                 var arraySize = asArray.size;
-                var arrayType = resolveArrayType(type);
-                System.out.println(LLVMPrintTypeToString(arrayType).getString());
+                var outerArrayType = resolveArrayType(type);
+                var arrayType = resolveInnerArrayType(type);
 
                 if (currentBlock == null) {
-                    alloca = LLVMAddGlobal(module, arrayType, varDef.name);
+                    alloca = LLVMAddGlobal(module, outerArrayType, varDef.name);
                     var zeroes = new PointerPointer<>(1);
                     for (int i = 0; i < arraySize; i++) {
                         zeroes.put(i, LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0));
                     }
-                    // Napolni array po vseh dimenzijah.
-                    System.out.println(LLVMPrintValueToString(LLVMConstArray2(arrayType, zeroes, arraySize)).getString());
 
-                    System.out.println(LLVMPrintValueToString(LLVMConstArray2(LLVMArrayType2(LLVMInt32TypeInContext(context), 5), zeroes, arraySize)).getString());
-                    LLVMSetInitializer(alloca, LLVMConstArray2(LLVMArrayType2(LLVMInt32TypeInContext(context), 5), zeroes, arraySize));
+                    LLVMSetInitializer(alloca, LLVMConstArray2(arrayType, zeroes, arraySize));
                 } else {
-                    alloca = LLVMBuildAlloca(builder, arrayType,
+                    alloca = LLVMBuildAlloca(builder, outerArrayType,
                             varDef.name);
                 }
             }
