@@ -2,6 +2,14 @@
   "configurations": [
     {
       "type": "java",
+      "name": "OBJ",
+      "request": "launch",
+      "mainClass": "Main",
+      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
+      "args": "PINS add.txt --dump OBJ --exec OBJ"
+    },
+    {
+      "type": "java",
       "name": "INT",
       "request": "launch",
       "mainClass": "Main",
