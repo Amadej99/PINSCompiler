@@ -124,6 +124,9 @@ public class Main {
             return;
         }
 
+        /**
+         * Zgeneriraj vmesno kodo LLVM.
+         */
         BytePointer error = new BytePointer();
         LLVMContextRef context = LLVMContextCreate();
         LLVMModuleRef module = LLVMModuleCreateWithNameInContext("PINS", context);
@@ -146,6 +149,9 @@ public class Main {
             return;
         }
 
+        /**
+         * Izvedi kodo z LLVM tolmačem.
+         */
         LLVMExecutionEngineRef engine = new LLVMExecutionEngineRef();
         if (LLVMCreateInterpreterForModule(engine, module, error) != 0) {
             System.err.println("Failed to create LLVM interpreter: " + error.getString());
@@ -153,45 +159,51 @@ public class Main {
             return;
         }
 
-
         if (cli.dumpPhases.contains(Phase.INT)) {
             var mainArgument = LLVMCreateGenericValueOfInt(LLVMInt32TypeInContext(context), 1, 0);
             LLVMRunFunction(engine, LLVMGetNamedFunction(module, "main"), 1, mainArgument);
         }
 
-        if(cli.execPhase.equals(Phase.INT)){
+        if (cli.execPhase.equals(Phase.INT)) {
             return;
         }
 
+        /**
+         * Zapiši object file.
+         */
+        LLVMInitializeAllTargetInfos();
+        LLVMInitializeAllTargets();
+        LLVMInitializeAllTargetMCs();
+        LLVMInitializeAllAsmParsers();
+        LLVMInitializeAllAsmPrinters();
+
+        var targetTriple = LLVMGetDefaultTargetTriple();
+
+        LLVMTargetRef target = new LLVMTargetRef();
+        if (LLVMGetTargetFromTriple(targetTriple, target, error) != 0) {
+            System.out.println("Failed to get target: " + error.toString());
+            LLVMDisposeMessage(error);
+            return;
+        }
+
+        var targetMachine = LLVMCreateTargetMachine(target, targetTriple, LLVMGetHostCPUName(),
+                LLVMGetHostCPUFeatures(),
+                LLVMCodeGenLevelNone, 0, LLVMCodeModelDefault);
+        LLVMCreateTargetDataLayout(targetMachine);
+        LLVMSetTarget(module, targetTriple);
+
+        if (LLVMTargetMachineEmitToFile(targetMachine, module, "object.o", 1, error) != 0) {
+            System.err.println("Failed to emit object file!");
+            LLVMDisposeMessage(error);
+            return;
+        }
+        
+        System.out.println("Succesfully written object.o");
+
         if (cli.dumpPhases.contains(Phase.OBJ)) {
-
-            LLVMInitializeAllTargetInfos();
-            LLVMInitializeAllTargets();
-            LLVMInitializeAllTargetMCs();
-            LLVMInitializeAllAsmParsers();
-            LLVMInitializeAllAsmPrinters();
-
-            var targetTriple = LLVMGetDefaultTargetTriple();
-
-            // var target = new PointerPointer<LLVMTargetRef>(1);
-
-            LLVMTargetRef target = new LLVMTargetRef();
-            if (LLVMGetTargetFromTriple(targetTriple, target, error) != 0) {
-                System.out.println("Failed to get target: " + error.toString());
-                LLVMDisposeMessage(error);
-                return;
-            }
-
-            var targetMachine = LLVMCreateTargetMachine(target, targetTriple.getString(), "generic", "",
-                    LLVMCodeGenLevelNone, 0, LLVMCodeModelDefault);
-            LLVMCreateTargetDataLayout(targetMachine);
-            LLVMSetTarget(module, targetTriple);
-
-            if (LLVMTargetMachineEmitToFile(targetMachine, module, "object.o", 1, error) != 0) {
-                System.err.println("Failed to emit object file!");
-                LLVMDisposeMessage(error);
-                return;
-            }
+            System.out.println("Target triple: " + LLVMGetDefaultTargetTriple().getString());
+            System.out.println("Target CPU: " + LLVMGetHostCPUName().getString());
+            System.out.println("CPU Features: " + LLVMGetHostCPUFeatures().getString());
         }
 
         // Stage 6: Dispose of the allocated resources
