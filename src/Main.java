@@ -153,46 +153,45 @@ public class Main {
             return;
         }
 
-        var mainArgument = LLVMCreateGenericValueOfInt(LLVMInt32TypeInContext(context), 1, 0);
-        LLVMGenericValueRef mainResult = LLVMRunFunction(engine, LLVMGetNamedFunction(module, "main"), 1, mainArgument);
-
-        LLVMInitializeAllTargetInfos();
-        LLVMInitializeAllTargets();
-        LLVMInitializeAllTargetMCs();
-        LLVMInitializeAllAsmParsers();
-        LLVMInitializeAllAsmPrinters();
-
-        var targetTriple = LLVMGetDefaultTargetTriple();
-
-        // var target = new PointerPointer<LLVMTargetRef>(1);
-
-        LLVMTargetRef target = new LLVMTargetRef();
-        if (LLVMGetTargetFromTriple(targetTriple, target, error) != 0) {
-            System.out.println("Failed to get target: " + error.toString());
-            LLVMDisposeMessage(error);
-            return;
-        }
-
-        var targetMachine = LLVMCreateTargetMachine(target, targetTriple.getString(), "generic", "",
-                LLVMCodeGenLevelNone, 0, LLVMCodeModelDefault);
-        LLVMCreateTargetDataLayout(targetMachine);
-        LLVMSetTarget(module, targetTriple);
-
-        if (LLVMTargetMachineEmitToFile(targetMachine, module, "object.o", 1, error) != 0) {
-            System.err.println("Failed to emit object file!");
-            LLVMDisposeMessage(error);
-            return;
-        }
 
         if (cli.dumpPhases.contains(Phase.INT)) {
-            System.out.println("Running main(1) with LLVM interpreter...");
+            var mainArgument = LLVMCreateGenericValueOfInt(LLVMInt32TypeInContext(context), 1, 0);
+            LLVMRunFunction(engine, LLVMGetNamedFunction(module, "main"), 1, mainArgument);
+        }
 
-            long returnedInteger = LLVMGenericValueToInt(mainResult, 0);
-            System.out.println("Returned Integer: " + returnedInteger);
+        if(cli.execPhase.equals(Phase.INT)){
+            return;
+        }
 
-            // long returnedStringPointer = LLVMGenericValueToPointer(mainResult).address();
-            // String returnedString = convertPointerToString(returnedStringPointer);
-            // System.out.println("Returned String: " + returnedString);
+        if (cli.dumpPhases.contains(Phase.OBJ)) {
+
+            LLVMInitializeAllTargetInfos();
+            LLVMInitializeAllTargets();
+            LLVMInitializeAllTargetMCs();
+            LLVMInitializeAllAsmParsers();
+            LLVMInitializeAllAsmPrinters();
+
+            var targetTriple = LLVMGetDefaultTargetTriple();
+
+            // var target = new PointerPointer<LLVMTargetRef>(1);
+
+            LLVMTargetRef target = new LLVMTargetRef();
+            if (LLVMGetTargetFromTriple(targetTriple, target, error) != 0) {
+                System.out.println("Failed to get target: " + error.toString());
+                LLVMDisposeMessage(error);
+                return;
+            }
+
+            var targetMachine = LLVMCreateTargetMachine(target, targetTriple.getString(), "generic", "",
+                    LLVMCodeGenLevelNone, 0, LLVMCodeModelDefault);
+            LLVMCreateTargetDataLayout(targetMachine);
+            LLVMSetTarget(module, targetTriple);
+
+            if (LLVMTargetMachineEmitToFile(targetMachine, module, "object.o", 1, error) != 0) {
+                System.err.println("Failed to emit object file!");
+                LLVMDisposeMessage(error);
+                return;
+            }
         }
 
         // Stage 6: Dispose of the allocated resources

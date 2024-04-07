@@ -55,7 +55,7 @@ public class PINS {
      * Faze prevajanja.
      */
     public static enum Phase {
-        LEX, SYN, AST, NAME, TYP, FRM, IMC, INT
+        LEX, SYN, AST, NAME, TYP, FRM, IMC, INT, OBJ
     }
 
     /**
