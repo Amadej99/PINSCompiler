@@ -74,14 +74,12 @@ public class LLVMCodeGenerator implements Visitor {
     public NodeDescription<LLVMValueRef> IRNodes;
 
     /**
-     *
+     *  Kazalci na vrednosti.
      */
     public HashMap<String, LLVMValueRef> NamedValues;
 
-    public HashMap<String, LLVMValueRef> GlobalValues;
-
     /**
-     *
+     *  Tipi funkcij.
      */
     public HashMap<String, LLVMTypeRef> functionTypes;
 
@@ -99,7 +97,6 @@ public class LLVMCodeGenerator implements Visitor {
         this.types = types;
         this.IRNodes = new NodeDescription<LLVMValueRef>();
         this.NamedValues = new HashMap<String, LLVMValueRef>();
-        this.GlobalValues = new HashMap<String, LLVMValueRef>();
         this.functionTypes = new HashMap<>();
     }
 
