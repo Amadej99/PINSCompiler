@@ -146,6 +146,9 @@ public class Main {
             LLVMDumpModule(module);
         }
         if (cli.execPhase == Phase.IMC) {
+            LLVMDisposePassManager(pm);
+            LLVMDisposeBuilder(builder);
+            LLVMContextDispose(context);
             return;
         }
 
@@ -165,6 +168,10 @@ public class Main {
         }
 
         if (cli.execPhase.equals(Phase.INT)) {
+            LLVMDisposeExecutionEngine(engine);
+            LLVMDisposePassManager(pm);
+            LLVMDisposeBuilder(builder);
+            LLVMContextDispose(context);
             return;
         }
 
