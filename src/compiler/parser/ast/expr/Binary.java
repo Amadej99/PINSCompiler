@@ -36,6 +36,17 @@ public class Binary extends Expr {
         this.right = right;
     }
 
+    
+    public Name getArrayName(){
+        Binary currentBinary = this;
+
+        while (!(currentBinary.left instanceof Name)) {
+            currentBinary = (Binary) currentBinary.left;
+        }
+
+        return (Name) currentBinary.left;
+    }
+
 	@Override public void accept(Visitor visitor) { visitor.visit(this); }
 
     public static enum Operator {

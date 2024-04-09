@@ -36,6 +36,8 @@ import compiler.parser.ast.type.TypeName;
 import compiler.seman.common.NodeDescription;
 import compiler.seman.type.type.Type;
 
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -74,12 +76,14 @@ public class LLVMCodeGenerator implements Visitor {
     public NodeDescription<LLVMValueRef> IRNodes;
 
     /**
-     *  Kazalci na vrednosti.
+     * Kazalci na vrednosti.
      */
     public HashMap<String, LLVMValueRef> NamedValues;
 
+    public HashMap<String, LLVMTypeRef> NameTypes;
+
     /**
-     *  Tipi funkcij.
+     * Tipi funkcij.
      */
     public HashMap<String, LLVMTypeRef> functionTypes;
 
@@ -97,12 +101,15 @@ public class LLVMCodeGenerator implements Visitor {
         this.types = types;
         this.IRNodes = new NodeDescription<LLVMValueRef>();
         this.NamedValues = new HashMap<String, LLVMValueRef>();
+        this.NameTypes = new HashMap<String, LLVMTypeRef>();
         this.functionTypes = new HashMap<>();
     }
 
     @Override
     public void visit(Call call) {
         var calledFunction = LLVMGetNamedFunction(module, call.name);
+
+//        System.out.println(LLVMPrintValueToString(calledFunction).getString());
 
         call.arguments.forEach(argument -> argument.accept(this));
 
@@ -135,18 +142,12 @@ public class LLVMCodeGenerator implements Visitor {
                 LLVMBuildStore(builder, right, address);
                 IRNodes.store(right, binary);
                 return;
-            } else if (binary.left instanceof Binary arrBinary) {
+            } else if (binary.left instanceof Binary) {
                 // TODO: Refactor
 
-                Name name = null;
-                Binary currentBinary = binary;
-
-                while (!(currentBinary.left instanceof Name)) {
-                    currentBinary = (Binary) currentBinary.left;
-                }
-
-                name = (Name) currentBinary.left;
-                var arrayType = resolveArrayType(types.valueFor(name).get());
+                var name = binary.getArrayName();
+                var arrayAtomType = resolveArrayLLVMAtomType(types.valueFor(name).get());
+                var arrayType = resolveLLVMArrayType(types.valueFor(name).get(), arrayAtomType);
 
                 var indecesAsList = new ArrayList<Pointer>();
                 indecesAsList.add(LLVMConstInt(LLVMInt64TypeInContext(context), 0, 0));
@@ -156,11 +157,6 @@ public class LLVMCodeGenerator implements Visitor {
                 indecesAsList.toArray(pointersArray);
 
                 var indeces = new PointerPointer<>(pointersArray);
-
-                // for (Pointer index : indecesAsList) {
-                // System.out.println(LLVMPrintValueToString(((LLVMValueRef)
-                // index)).getString());
-                // }
 
                 var gep = LLVMBuildInBoundsGEP2(builder, arrayType, NamedValues.get(name.name), indeces,
                         indecesAsList.size(), name.name);
@@ -213,15 +209,9 @@ public class LLVMCodeGenerator implements Visitor {
         } else if (binary.operator.equals(Binary.Operator.OR)) {
             IRNodes.store(LLVMBuildOr(builder, left, right, "or"), binary);
         } else if (binary.operator.equals(Binary.Operator.ARR)) {
-            Name name = null;
-            Binary currentBinary = binary;
-
-            while (!(currentBinary.left instanceof Name)) {
-                currentBinary = (Binary) currentBinary.left;
-            }
-
-            name = (Name) currentBinary.left;
-            var arrayType = resolveArrayType(types.valueFor(name).get());
+            var name = binary.getArrayName();
+            var arrayAtomType = resolveArrayLLVMAtomType(types.valueFor(name).get());
+            var arrayType = resolveLLVMArrayType(types.valueFor(name).get(), arrayAtomType);
 
             var indecesAsList = new ArrayList<Pointer>();
             indecesAsList.add(LLVMConstInt(LLVMInt64TypeInContext(context), 0, 0));
@@ -234,27 +224,45 @@ public class LLVMCodeGenerator implements Visitor {
 
             var gep = LLVMBuildInBoundsGEP2(builder, arrayType, NamedValues.get(name.name), indeces,
                     indecesAsList.size(), name.name);
-            var load = LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), gep, name.name);
+            var load = LLVMBuildLoad2(builder, arrayAtomType, gep, name.name);
             IRNodes.store(load, binary);
         }
     }
 
     // TODO: Refactor!
 
-    private LLVMTypeRef resolveArrayType(Type type) {
+    private LLVMTypeRef resolveLLVMArrayType(Type type, LLVMTypeRef atomType) {
         if (!type.asArray().get().type.isArray()) {
-            return LLVMArrayType2(LLVMInt32TypeInContext(context), type.asArray().get().size);
+            return LLVMArrayType2(atomType, type.asArray().get().size);
         } else
-            return LLVMArrayType2(resolveArrayType(type.asArray().get().type.asArray().get()),
+            return LLVMArrayType2(resolveLLVMArrayType(type.asArray().get().type.asArray().get(), atomType),
                     type.asArray().get().size);
     }
 
-    private LLVMTypeRef resolveInnerArrayType(Type type) {
+    private LLVMTypeRef resolveInnerLLVMArrayType(Type type, LLVMTypeRef atomType) {
         if (!type.asArray().get().type.isArray()) {
-            return LLVMInt32TypeInContext(context);
+            return atomType;
         } else
-            return LLVMArrayType2(resolveInnerArrayType(type.asArray().get().type.asArray().get()),
+            return LLVMArrayType2(resolveInnerLLVMArrayType(type.asArray().get().type.asArray().get(), atomType),
                     type.asArray().get().type.asArray().get().size);
+    }
+
+    private LLVMTypeRef resolveArrayLLVMAtomType(Type type) {
+        while (!type.isAtom()) {
+            if (!type.isArray())
+                Report.error("Tip ni seznam, napaka v pomozni funkciji resolveArrayAtomType!");
+            type = type.asArray().get().type;
+        }
+        return convertToLLVMType(type);
+    }
+
+    private Type resolveArrayAtomType(Type type) {
+        while (!type.isAtom()) {
+            if (!type.isArray())
+                Report.error("Tip ni seznam, napaka v pomozni funkciji resolveArrayAtomType!");
+            type = type.asArray().get().type;
+        }
+        return type;
     }
 
     private void resolveArrayIndeces(Binary binary, List<Pointer> indeces) {
@@ -335,16 +343,10 @@ public class LLVMCodeGenerator implements Visitor {
         LLVMValueRef alloca = NamedValues.get(name.name);
 
         types.valueFor(name).ifPresent(type -> {
-            if (type.isInt())
-                IRNodes.store(LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), alloca, name.name), name);
-            else if (type.isLog())
-                IRNodes.store(LLVMBuildLoad2(builder, LLVMInt1TypeInContext(context), alloca, name.name), name);
-            else if (type.isStr())
-                IRNodes.store(LLVMBuildLoad2(builder, LLVMPointerTypeInContext(context, 0), alloca, name.name),
-                        name);
-            else if (type.isArray()) {
+            if (type.isArray()) {
                 IRNodes.store(alloca, name);
-            }
+            } else
+                IRNodes.store(LLVMBuildLoad2(builder, NameTypes.get(name.name), alloca, name.name), name);
         });
     }
 
@@ -407,7 +409,8 @@ public class LLVMCodeGenerator implements Visitor {
                 IRNodes.store(LLVMConstInt(LLVMInt32TypeInContext(context), Integer.parseInt(literal.value), 0),
                         literal);
             else if (type.isLog())
-                IRNodes.store(LLVMConstInt(LLVMInt1Type(), literal.value.equals("true") ? 1 : 0, 0), literal);
+                IRNodes.store(LLVMConstInt(LLVMInt1TypeInContext(context), literal.value.equals("true") ? 1 : 0, 0),
+                        literal);
             else if (type.isStr()) {
                 var string = LLVMBuildGlobalStringPtr(builder, literal.value.replace("\\n", "\n"), ".string");
                 var indices = new PointerPointer<>(1).put(0, LLVMConstInt(LLVMInt64TypeInContext(context), 0, 0));
@@ -486,30 +489,21 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(FunDef funDef) {
+        // TODO: Handle functions being declared after call
         var parameterTypes = new PointerPointer<>(funDef.parameters.size());
+
+        var oldNameTypes = NameTypes.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
         IntStream.range(0, funDef.parameters.size()).forEach(i -> {
             Parameter parameter = funDef.parameters.get(i);
             types.valueFor(parameter.type).ifPresent(type -> {
-                if (type.isInt())
-                    parameterTypes.put(i, LLVMInt32TypeInContext(context));
-                else if (type.isLog())
-                    parameterTypes.put(i, LLVMInt1TypeInContext(context));
-                else if (type.isStr()) {
-                    parameterTypes.put(i, LLVMPointerTypeInContext(context, 0));
-                }
+                parameterTypes.put(i, convertToLLVMType(type));
+                NameTypes.put(parameter.name, convertToLLVMType(type));
             });
         });
 
         var returnType = types.valueFor(funDef.type).get();
-        LLVMTypeRef LLVMReturnType = null;
-
-        if (returnType.isInt())
-            LLVMReturnType = LLVMInt32TypeInContext(context);
-        else if (returnType.isLog())
-            LLVMReturnType = LLVMInt1TypeInContext(context);
-        else if (returnType.isStr())
-            LLVMReturnType = LLVMPointerTypeInContext(context, 0);
+        var LLVMReturnType = convertToLLVMType(returnType);
 
         var functionType = LLVMFunctionType(LLVMReturnType, parameterTypes, funDef.parameters.size(),
                 funDef.isVarArg ? 1 : 0);
@@ -523,18 +517,19 @@ public class LLVMCodeGenerator implements Visitor {
         var entry = LLVMAppendBasicBlockInContext(context, function, "entry");
         LLVMPositionBuilderAtEnd(builder, entry);
 
-        var oldNameValues = NamedValues;
+        var oldNameValues = NamedValues.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
         IntStream.range(0, funDef.parameters.size()).forEach(i -> {
             var parameter = funDef.parameters.get(i);
-            var alloca = LLVMBuildAlloca(builder, LLVMInt32TypeInContext(context), parameter.name);
+            var alloca = LLVMBuildAlloca(builder, NameTypes.get(parameter.name), parameter.name);
             LLVMBuildStore(builder, LLVMGetParam(function, i), alloca);
             NamedValues.put(parameter.name, alloca);
         });
 
         funDef.body.accept(this);
 
-        NamedValues = oldNameValues;
+        NameTypes = (HashMap<String, LLVMTypeRef>) oldNameTypes;
+        NamedValues = (HashMap<String, LLVMValueRef>) oldNameValues;
 
         var returnedValue = IRNodes.valueFor(funDef.body).get();
         LLVMBuildRet(builder, returnedValue);
@@ -545,8 +540,6 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(TypeDef typeDef) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'visit'");
     }
 
     @Override
@@ -555,45 +548,38 @@ public class LLVMCodeGenerator implements Visitor {
 
         types.valueFor(varDef).ifPresent(type -> {
             LLVMValueRef alloca = null;
-            if (type.isInt()) {
-                if (currentBlock == null) {
-                    alloca = LLVMAddGlobal(module, LLVMInt32TypeInContext(context), varDef.name);
-                    LLVMSetInitializer(alloca, LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0));
-                } else {
-                    alloca = LLVMBuildAlloca(builder, LLVMInt32TypeInContext(context), varDef.name);
-                }
-            } else if (type.isLog()) {
-                if (currentBlock == null) {
-                    alloca = LLVMAddGlobal(module, LLVMInt1TypeInContext(context), varDef.name);
-                    LLVMSetInitializer(alloca, LLVMConstInt(LLVMInt1TypeInContext(context), 0, 0));
-                } else {
-                    alloca = LLVMBuildAlloca(builder, LLVMInt1TypeInContext(context), varDef.name);
-                }
-            } else if (type.isStr()) {
-                if (currentBlock == null) {
-                    alloca = LLVMAddGlobal(module, LLVMPointerTypeInContext(context, 0), varDef.name);
-                    LLVMSetInitializer(alloca, LLVMConstNull(LLVMPointerTypeInContext(context, 0)));
-                } else {
-                    alloca = LLVMBuildAlloca(builder, LLVMPointerTypeInContext(context, 0), varDef.name);
-                }
-            } else if (type.isArray()) {
-                var asArray = type.asArray().get();
-                var arraySize = asArray.size;
-                var outerArrayType = resolveArrayType(type);
-                var arrayType = resolveInnerArrayType(type);
+            if (type.isArray()) {
+                var arrayLLVMAtomType = resolveArrayLLVMAtomType(type);
+                var outerLLVMArrayType = resolveLLVMArrayType(type, arrayLLVMAtomType);
 
                 if (currentBlock == null) {
-                    alloca = LLVMAddGlobal(module, outerArrayType, varDef.name);
+                    var asArray = type.asArray().get();
+                    var arraySize = asArray.size;
+                    var LLVMArrayType = resolveInnerLLVMArrayType(type, arrayLLVMAtomType);
+                    var arrayAtomType = resolveArrayAtomType(type);
+                    alloca = LLVMAddGlobal(module, outerLLVMArrayType, varDef.name);
                     var zeroes = new PointerPointer<>(1);
                     for (int i = 0; i < arraySize; i++) {
-                        zeroes.put(i, LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0));
+                        if (arrayAtomType.isInt() || arrayAtomType.isLog())
+                            zeroes.put(i, LLVMConstInt(arrayLLVMAtomType, 0, 0));
+                        else if (arrayAtomType.isStr())
+                            zeroes.put(i, LLVMConstNull(LLVMPointerTypeInContext(context, 0)));
                     }
 
-                    LLVMSetInitializer(alloca, LLVMConstArray2(arrayType, zeroes, arraySize));
+                    LLVMSetInitializer(alloca, LLVMConstArray2(LLVMArrayType, zeroes, arraySize));
                 } else {
-                    alloca = LLVMBuildAlloca(builder, outerArrayType,
+                    alloca = LLVMBuildAlloca(builder, outerLLVMArrayType,
                             varDef.name);
                 }
+            } else {
+                var llvmType = convertToLLVMType(type);
+                if (currentBlock == null) {
+                    alloca = LLVMAddGlobal(module, llvmType, varDef.name);
+                    LLVMSetInitializer(alloca, getGlobalInitializer(type));
+                } else
+                    alloca = LLVMBuildAlloca(builder, llvmType, varDef.name);
+
+                NameTypes.put(varDef.name, llvmType);
             }
             NamedValues.put(varDef.name, alloca);
         });
@@ -619,6 +605,24 @@ public class LLVMCodeGenerator implements Visitor {
     public void visit(TypeName name) {
         // TODO Auto-generated method stub
         throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    }
+
+    private LLVMTypeRef convertToLLVMType(Type type) {
+        if (type.isInt())
+            return LLVMInt32TypeInContext(context);
+        else if (type.isLog())
+            return LLVMInt1TypeInContext(context);
+        else if (type.isStr())
+            return LLVMPointerTypeInContext(context, 0);
+        else
+            return null;
+    }
+
+    private LLVMValueRef getGlobalInitializer(Type type) {
+        if (type.isInt() || type.isLog())
+            return LLVMConstInt(convertToLLVMType(type), 0, 0);
+        else
+            return LLVMConstNull(convertToLLVMType(type));
     }
 
 }
