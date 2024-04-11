@@ -6,10 +6,16 @@
 package compiler.seman.type.type;
 
 import static common.RequireNonNull.requireNonNull;
+import static org.bytedeco.llvm.global.LLVM.LLVMInt1TypeInContext;
+import static org.bytedeco.llvm.global.LLVM.LLVMInt32TypeInContext;
+import static org.bytedeco.llvm.global.LLVM.LLVMPointerTypeInContext;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
+import org.bytedeco.llvm.LLVM.LLVMContextRef;
+import org.bytedeco.llvm.LLVM.LLVMTypeRef;
 
 import common.Constants;
 
@@ -104,6 +110,17 @@ public abstract class Type {
         if (this instanceof Function t)
             return Optional.of(t);
         return Optional.empty();
+    }
+
+    public LLVMTypeRef convertToLLVMType(LLVMContextRef context){
+        if (this.isInt())
+        return LLVMInt32TypeInContext(context);
+    else if (this.isLog())
+        return LLVMInt1TypeInContext(context);
+    else if (this.isStr())
+        return LLVMPointerTypeInContext(context, 0);
+    else
+        return null;
     }
 
     // ------------------------------------
