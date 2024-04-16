@@ -6,6 +6,7 @@
 package compiler.seman.type.type;
 
 import static common.RequireNonNull.requireNonNull;
+import static org.bytedeco.llvm.global.LLVM.LLVMArrayType2;
 import static org.bytedeco.llvm.global.LLVM.LLVMInt1TypeInContext;
 import static org.bytedeco.llvm.global.LLVM.LLVMInt32TypeInContext;
 import static org.bytedeco.llvm.global.LLVM.LLVMPointerTypeInContext;
@@ -18,6 +19,7 @@ import org.bytedeco.llvm.LLVM.LLVMContextRef;
 import org.bytedeco.llvm.LLVM.LLVMTypeRef;
 
 import common.Constants;
+import common.Report;
 
 public abstract class Type {
     /**
@@ -96,6 +98,63 @@ public abstract class Type {
     }
 
     /**
+     * Vrne tip seznama v LLVM obliki.
+     * @param type
+     * @param atomType
+     * @return
+     */
+    public static LLVMTypeRef resolveLLVMArrayType(Type type, LLVMTypeRef atomType) {
+        if (!type.asArray().get().type.isArray()) {
+            return LLVMArrayType2(atomType, type.asArray().get().size);
+        } else
+            return LLVMArrayType2(resolveLLVMArrayType(type.asArray().get().type.asArray().get(), atomType),
+                    type.asArray().get().size);
+    }
+
+    /**
+     * Vrne atomarni tip seznama v LLVM obliki.
+     * @param context
+     * @param type
+     * @return
+     */
+    public static LLVMTypeRef resolveArrayLLVMAtomType(LLVMContextRef context, Type type) {
+        while (!type.isAtom()) {
+            if (!type.isArray())
+                Report.error("Tip ni seznam, napaka v pomozni funkciji resolveArrayAtomType!");
+            type = type.asArray().get().type;
+        }
+        return type.convertToLLVMType(context);
+    }
+
+    /**
+     * Vrne notranji tip seznama v LLVM obliki za pravilno inicializacijo globalnih seznamov.
+     * @param type
+     * @param atomType
+     * @return
+     */
+    public static LLVMTypeRef resolveInnerLLVMArrayType(Type type, LLVMTypeRef atomType) {
+        if (!type.asArray().get().type.isArray()) {
+            return atomType;
+        } else
+            return LLVMArrayType2(resolveInnerLLVMArrayType(type.asArray().get().type.asArray().get(), atomType),
+                    type.asArray().get().type.asArray().get().size);
+    }
+
+    /**
+     * Vrne atomarni tip seznama.
+     * @param type
+     * @return
+     */
+    public static Type resolveArrayAtomType(Type type) {
+        while (!type.isAtom()) {
+            if (!type.isArray())
+                Report.error("Tip ni seznam, napaka v pomozni funkciji resolveArrayAtomType!");
+            type = type.asArray().get().type;
+        }
+        return type;
+    }
+
+    /**
      * Preveri, ali je tip funkcijski tip.
      */
     public boolean isFunction() {
@@ -112,15 +171,20 @@ public abstract class Type {
         return Optional.empty();
     }
 
-    public LLVMTypeRef convertToLLVMType(LLVMContextRef context){
+    /**
+     * Pretvori atomarni tip v LLVM atomarni tip.
+     * @param context
+     * @return
+     */
+    public LLVMTypeRef convertToLLVMType(LLVMContextRef context) {
         if (this.isInt())
-        return LLVMInt32TypeInContext(context);
-    else if (this.isLog())
-        return LLVMInt1TypeInContext(context);
-    else if (this.isStr())
-        return LLVMPointerTypeInContext(context, 0);
-    else
-        return null;
+            return LLVMInt32TypeInContext(context);
+        else if (this.isLog())
+            return LLVMInt1TypeInContext(context);
+        else if (this.isStr())
+            return LLVMPointerTypeInContext(context, 0);
+        else
+            return null;
     }
 
     // ------------------------------------

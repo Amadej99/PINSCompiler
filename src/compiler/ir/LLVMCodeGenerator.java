@@ -36,6 +36,8 @@ import compiler.parser.ast.type.TypeName;
 import compiler.seman.common.NodeDescription;
 import compiler.seman.type.type.Type;
 
+import static compiler.seman.type.type.Type.Array.*;
+
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -138,7 +140,7 @@ public class LLVMCodeGenerator implements Visitor {
                 // TODO: Refactor
 
                 var name = binary.getArrayName();
-                var arrayAtomType = resolveArrayLLVMAtomType(types.valueFor(name).get());
+                var arrayAtomType = resolveArrayLLVMAtomType(context, types.valueFor(name).get());
                 var arrayType = resolveLLVMArrayType(types.valueFor(name).get(), arrayAtomType);
 
                 var indecesAsList = new ArrayList<Pointer>();
@@ -202,7 +204,7 @@ public class LLVMCodeGenerator implements Visitor {
             IRNodes.store(LLVMBuildOr(builder, left, right, "or"), binary);
         } else if (binary.operator.equals(Binary.Operator.ARR)) {
             var name = binary.getArrayName();
-            var arrayAtomType = resolveArrayLLVMAtomType(types.valueFor(name).get());
+            var arrayAtomType = resolveArrayLLVMAtomType(context, types.valueFor(name).get());
             var arrayType = resolveLLVMArrayType(types.valueFor(name).get(), arrayAtomType);
 
             var indecesAsList = new ArrayList<Pointer>();
@@ -222,40 +224,6 @@ public class LLVMCodeGenerator implements Visitor {
     }
 
     // TODO: Refactor!
-
-    private LLVMTypeRef resolveLLVMArrayType(Type type, LLVMTypeRef atomType) {
-        if (!type.asArray().get().type.isArray()) {
-            return LLVMArrayType2(atomType, type.asArray().get().size);
-        } else
-            return LLVMArrayType2(resolveLLVMArrayType(type.asArray().get().type.asArray().get(), atomType),
-                    type.asArray().get().size);
-    }
-
-    private LLVMTypeRef resolveInnerLLVMArrayType(Type type, LLVMTypeRef atomType) {
-        if (!type.asArray().get().type.isArray()) {
-            return atomType;
-        } else
-            return LLVMArrayType2(resolveInnerLLVMArrayType(type.asArray().get().type.asArray().get(), atomType),
-                    type.asArray().get().type.asArray().get().size);
-    }
-
-    private LLVMTypeRef resolveArrayLLVMAtomType(Type type) {
-        while (!type.isAtom()) {
-            if (!type.isArray())
-                Report.error("Tip ni seznam, napaka v pomozni funkciji resolveArrayAtomType!");
-            type = type.asArray().get().type;
-        }
-        return type.convertToLLVMType(context);
-    }
-
-    private Type resolveArrayAtomType(Type type) {
-        while (!type.isAtom()) {
-            if (!type.isArray())
-                Report.error("Tip ni seznam, napaka v pomozni funkciji resolveArrayAtomType!");
-            type = type.asArray().get().type;
-        }
-        return type;
-    }
 
     private void resolveArrayIndeces(Binary binary, List<Pointer> indeces) {
         binary.right.accept(this);
@@ -547,7 +515,7 @@ public class LLVMCodeGenerator implements Visitor {
         types.valueFor(varDef).ifPresent(type -> {
             LLVMValueRef alloca = null;
             if (type.isArray()) {
-                var arrayLLVMAtomType = resolveArrayLLVMAtomType(type);
+                var arrayLLVMAtomType = resolveArrayLLVMAtomType(context, type);
                 var outerLLVMArrayType = resolveLLVMArrayType(type, arrayLLVMAtomType);
 
                 if (currentBlock == null) {
