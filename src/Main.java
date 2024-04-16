@@ -37,12 +37,6 @@ import compiler.seman.type.type.Type;
 
 public class Main {
 
-    static {
-        System.loadLibrary("PtrToString");
-    }
-
-    public static native String convertPointerToString(long pointer);
-
     /**
      * Metoda, ki izvede celotni proces prevajanja.
      *
@@ -145,12 +139,9 @@ public class Main {
         if (cli.dumpPhases.contains(Phase.IMC)) {
             LLVMDumpModule(module);
         }
-        if (cli.execPhase == Phase.IMC) {
-            LLVMDisposePassManager(pm);
-            LLVMDisposeBuilder(builder);
-            LLVMContextDispose(context);
+
+        if(cli.execPhase.equals(Phase.IMC))
             return;
-        }
 
         /**
          * Izvedi kodo z LLVM tolmačem.
@@ -167,13 +158,8 @@ public class Main {
             LLVMRunFunction(engine, LLVMGetNamedFunction(module, "main"), 1, mainArgument);
         }
 
-        if (cli.execPhase.equals(Phase.INT)) {
-            LLVMDisposeExecutionEngine(engine);
-            LLVMDisposePassManager(pm);
-            LLVMDisposeBuilder(builder);
-            LLVMContextDispose(context);
+        if(cli.execPhase.equals(Phase.INT))
             return;
-        }
 
         /**
          * Zapiši object file.
@@ -213,10 +199,5 @@ public class Main {
             System.out.println("CPU Features: " + LLVMGetHostCPUFeatures().getString());
         }
 
-        // Stage 6: Dispose of the allocated resources
-        LLVMDisposeExecutionEngine(engine);
-        LLVMDisposePassManager(pm);
-        LLVMDisposeBuilder(builder);
-        LLVMContextDispose(context);
     }
 }
