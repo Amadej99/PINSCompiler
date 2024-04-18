@@ -1,16 +1,17 @@
 source -> definitions .
 
 definitions -> definition definitions2 .
-definitions2 -> ; definition definitions2 .
+definitions2 -> ; definitions .
 definitions2 -> .
 definition -> function_definition .
+definition -> function_declaration .
 definition -> type_definition .
 definition -> variable_definition .
 
 type_definition -> typ identifier : type .
 variable_definition -> var identifier : type .
 function_definition -> fun identifier ( parameters ) : type = expression .
-
+function_declaration -> declare identifier ( parameters ) : type .
 
 type -> identifier .
 type -> logical .
@@ -24,6 +25,7 @@ parameters2 -> , parameter parameters2 .
 parameters2 -> .
 
 parameter -> identifier : type .
+parameter -> ... .
 
 expression -> logical_ior_expression expression2 .
 expression2 -> .
@@ -70,7 +72,7 @@ atom_expression -> log_constant .
 atom_expression -> int_constant .
 atom_expression -> str_constant .
 atom_expression -> identifier atom_expression2 .
-atom_expression -> ( expression ) .
+atom_expression -> ( expressions ) .
 atom_expression -> { atom_expression4 .
 
 atom_expression2 -> .

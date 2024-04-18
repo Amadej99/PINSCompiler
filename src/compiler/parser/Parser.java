@@ -588,7 +588,7 @@ public class Parser {
 			var left = new Name(s.position, s.lexeme);
 			return parseAtomExpression2(left);
 		} else if (si.getNext().equals(OP_LPARENT)) {
-			dump("atom_expression -> ( expression )");
+			dump("atom_expression -> ( expressions )");
 			si.skip();
 			var exprs = parseExpressions(new ArrayList<Expr>());
 			if (si.getNext().equals(OP_RPARENT)) {
