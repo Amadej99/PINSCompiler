@@ -1,0 +1,27 @@
+// Define the project and its properties
+// Apply plugins
+apply plugin: 'java' // or any other relevant plugins for your project
+
+sourceCompatibility = 21
+targetCompatibility = 21
+
+
+repositories {
+    mavenCentral()
+}
+
+// Define dependencies
+dependencies {
+    // Example dependency
+    implementation "org.bytedeco:javacpp:1.5.10"
+    implementation "org.bytedeco:llvm-platform:17.0.6-1.5.10"
+    implementation files('lib/ArgPar-0.1.jar')
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src'] // Assuming your source files are in the 'src' directory
+        }
+    }
+}

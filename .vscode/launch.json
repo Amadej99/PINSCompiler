@@ -5,7 +5,6 @@
       "name": "OBJ",
       "request": "launch",
       "mainClass": "Main",
-      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
       "args": "PINS add.txt --dump OBJ --exec OBJ"
     },
     {
@@ -13,7 +12,6 @@
       "name": "INT",
       "request": "launch",
       "mainClass": "Main",
-      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
       "args": "PINS add.txt --dump INT --exec INT"
     },
     {
@@ -21,7 +19,6 @@
       "name": "IMC",
       "request": "launch",
       "mainClass": "Main",
-      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
       "args": "PINS add.txt --dump IMC --exec IMC"
     },
     {
@@ -29,7 +26,6 @@
       "name": "TYP",
       "request": "launch",
       "mainClass": "Main",
-      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
       "args": "PINS add.txt --dump TYP --exec TYP"
     },
     {
@@ -37,7 +33,6 @@
       "name": "AST",
       "request": "launch",
       "mainClass": "Main",
-      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
       "args": "PINS add.txt --dump AST --exec AST"
     },
     {
@@ -45,7 +40,6 @@
       "name": "LEX",
       "request": "launch",
       "mainClass": "Main",
-      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
       "args": "PINS add.txt --dump LEX --exec LEX"
     },
     {
@@ -53,7 +47,6 @@
       "name": "SYN",
       "request": "launch",
       "mainClass": "Main",
-      "vmArgs": "-Djava.library.path=${workspaceFolder}/jni",
       "args": "PINS add.txt --dump SYN --exec SYN"
     }
   ]
