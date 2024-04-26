@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="INT" type="Application" factoryName="Application">
     <option name="MAIN_CLASS_NAME" value="Main" />
-    <module name="pinscompiler.main" />
+    <module name="PINSCompiler.main" />
     <option name="PROGRAM_PARAMETERS" value="PINS add.txt --exec INT --dump INT" />
     <method v="2">
       <option name="Make" enabled="true" />
