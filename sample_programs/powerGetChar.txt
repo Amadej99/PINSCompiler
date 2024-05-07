@@ -1,0 +1,15 @@
+declare printf(_ : string, ...) : integer;
+declare getchar() : integer;
+
+fun power(x : integer, n : integer) : integer = (
+    { if ( n == 0 ) then { z = 1 }
+    else { z = x * power(x, n - 1)}},
+    z) { where var z : integer };
+
+fun main( argc : integer ) : integer = (
+    { x = getchar() - 48 }, { _ = getchar() }, { n = getchar() - 48 },
+    printf('%d ', x),
+    printf('%d\n', n),
+    {x = power(x, n)},
+    printf('%d\n', x)
+) { where var n : integer; var x : integer; var _ : integer }
