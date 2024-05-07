@@ -26,6 +26,7 @@ parameters2 -> .
 
 parameter -> identifier : type .
 parameter -> ... .
+parameter -> .
 
 expression -> logical_ior_expression expression2 .
 expression2 -> .
@@ -75,8 +76,8 @@ atom_expression -> identifier atom_expression2 .
 atom_expression -> ( expressions ) .
 atom_expression -> { atom_expression4 .
 
+atom_expression2 -> ( atom_expression5 .
 atom_expression2 -> .
-atom_expression2 -> ( expressions ) .
 
 atom_expression3 -> } .
 atom_expression3 -> else expression } .
@@ -85,6 +86,9 @@ atom_expression4 -> expression = expression } .
 atom_expression4 -> if expression then expression atom_expression3 .
 atom_expression4 -> while expression : expression } .
 atom_expression4 -> for identifier = expression , expression , expression : expression } .
+
+atom_expression5 -> ) .
+atom_expression5 -> expressions ) .
 
 
 expressions -> expression expressions2 .
