@@ -52,12 +52,12 @@ public class NameChecker implements Visitor {
         }, () -> {
             // Ce ni definirana, preveri ali je v knjiznici
             if (Constants.Library.contains(call.name))
-                call.arguments.forEach(argument -> argument.accept(this));
+                call.arguments.ifPresent(arguments -> arguments.forEach(argument -> argument.accept(this)));
             else
                 Report.error(call.name + " ni definirana funkcija!");
         });
         // Acceptaj argumente
-        call.arguments.forEach(argument -> argument.accept(this));
+        call.arguments.ifPresent(arguments -> arguments.forEach(argument -> argument.accept(this)));
     }
 
     @Override
@@ -142,12 +142,16 @@ public class NameChecker implements Visitor {
     public void visit(FunDef funDef) {
         // Sprejmi tip funkcije in tip parametrov
         funDef.type.accept(this);
-        funDef.parameters.forEach(parameter -> parameter.type.accept(this));
+
+        funDef.parameters.ifPresent(params -> {
+            params.forEach(parameter -> parameter.accept(this));
+        });
         // Sprejmi telo funkcije in parametre v novem scope-u
         symbolTable.inNewScope(() -> {
-            funDef.parameters.forEach(parameter -> parameter.accept(this));
-            if (funDef.body != null)
-                funDef.body.accept(this);
+            funDef.parameters.ifPresent(params -> {
+                params.forEach(parameter -> parameter.accept(this));
+            });
+            funDef.body.ifPresent(body -> body.accept(this));
         });
     }
 

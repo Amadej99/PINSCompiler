@@ -11,19 +11,20 @@ import compiler.common.Visitor;
 import compiler.lexer.Position;
 
 import java.util.List;
+import java.util.Optional;
 
 public class Call extends Expr {
     /**
      * Argumenti.
      */
-    public final List<Expr> arguments;
+    public final Optional<List<Expr>> arguments;
 
     /**
      * Ime funkcije, ki jo kličemo.
      */
     public final String name;
 
-    public Call(Position position, List<Expr> arguments, String name) {
+    public Call(Position position, Optional<List<Expr>> arguments, String name) {
         super(position);
         requireNonNull(arguments);
         requireNonNull(name);

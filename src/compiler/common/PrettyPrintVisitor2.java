@@ -76,7 +76,7 @@ public class PrettyPrintVisitor2 implements Visitor {
         println("Call", call, call.name);
         inNewScope(() -> {
             printDefinedAt(call);
-            call.arguments.forEach((arg) -> arg.accept(this));
+            call.arguments.ifPresent(arguments -> arguments.forEach((arg) -> arg.accept(this)));
         });
     }
 
@@ -174,9 +174,9 @@ public class PrettyPrintVisitor2 implements Visitor {
     public void visit(FunDef funDef) {
         println("FunDef", funDef, funDef.name);
         inNewScope(() -> {
-            visit(funDef.parameters);
+            funDef.parameters.ifPresent(parameters -> visit(parameters));
             funDef.type.accept(this);
-            funDef.body.accept(this);
+            funDef.body.ifPresent(body -> body.accept(this));
         });
     }
 

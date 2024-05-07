@@ -16,14 +16,13 @@ import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef;
 import org.bytedeco.llvm.LLVM.LLVMContextRef;
 import org.bytedeco.llvm.LLVM.LLVMExecutionEngineRef;
-import org.bytedeco.llvm.LLVM.LLVMGenericValueRef;
 import org.bytedeco.llvm.LLVM.LLVMModuleRef;
 import org.bytedeco.llvm.LLVM.LLVMPassManagerRef;
 import org.bytedeco.llvm.LLVM.LLVMTargetRef;
 
 import cli.PINS;
 import cli.PINS.Phase;
-import compiler.common.PrettyPrintVisitor4;
+import compiler.common.PrettyPrintVisitor3;
 import compiler.ir.LLVMCodeGenerator;
 import compiler.lexer.Lexer;
 import compiler.parser.Parser;
@@ -82,7 +81,7 @@ public class Main {
         /**
          * Abstraktna sintaksa.
          */
-        var prettyPrint = new PrettyPrintVisitor4(2, System.out);
+        var prettyPrint = new PrettyPrintVisitor3(2, System.out);
         if (cli.dumpPhases.contains(Phase.AST)) {
             ast.accept(prettyPrint);
         }

@@ -11,6 +11,7 @@ import compiler.common.Visitor;
 import compiler.lexer.Position;
 
 import java.util.List;
+import java.util.Optional;
 
 import compiler.parser.ast.type.Type;
 import compiler.parser.ast.expr.Expr;
@@ -19,7 +20,7 @@ public class FunDef extends Def {
     /**
      * Parametri.
      */
-    public final List<Parameter> parameters;
+    public final Optional<List<Parameter>> parameters;
 
     /**
      * Tip rezultata.
@@ -29,16 +30,15 @@ public class FunDef extends Def {
     /**
      * Jedro funkcije.
      */
-    public final Expr body;
+    public final Optional<Expr> body;
 
     /**
      * Je funkcija z variabilnim številom parametrov.
      */
     public final boolean isVarArg;
 
-    public FunDef(Position position, String name, List<Parameter> parameters, Type type, Expr body, boolean isVarArg) {
+    public FunDef(Position position, String name, Optional<List<Parameter>> parameters, Type type, Optional<Expr> body, boolean isVarArg) {
         super(position, name);
-        requireNonNull(parameters);
         requireNonNull(type);
         this.parameters = parameters;
         this.type = type;

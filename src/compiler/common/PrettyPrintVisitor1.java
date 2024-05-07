@@ -39,7 +39,7 @@ public class PrettyPrintVisitor1 implements Visitor {
      * Ustvari novo instanco.
      * 
      * @param increaseIndentBy za koliko naj se poveča indentacija pri gnezdenju.
-     * @param stream izhodni tok.
+     * @param stream           izhodni tok.
      */
     public PrettyPrintVisitor1(int increaseIndentBy, PrintStream stream) {
         requireNonNull(stream);
@@ -68,7 +68,7 @@ public class PrettyPrintVisitor1 implements Visitor {
     public void visit(Call call) {
         println("Call", call, call.name);
         inNewScope(() -> {
-            call.arguments.forEach((arg) -> arg.accept(this));
+            call.arguments.ifPresent(arguments -> arguments.forEach((arg) -> arg.accept(this)));
         });
     }
 
@@ -163,9 +163,9 @@ public class PrettyPrintVisitor1 implements Visitor {
     public void visit(FunDef funDef) {
         println("FunDef", funDef, funDef.name);
         inNewScope(() -> {
-            visit(funDef.parameters);
+            funDef.parameters.ifPresent(parameters -> visit(parameters));
             funDef.type.accept(this);
-            funDef.body.accept(this);
+            funDef.body.ifPresent(body -> body.accept(this));
         });
     }
 
@@ -221,7 +221,7 @@ public class PrettyPrintVisitor1 implements Visitor {
             node.accept(this);
         });
     }
-    
+
     // ----------------------------------
 
     /**
