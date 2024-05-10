@@ -12,9 +12,9 @@ repositories {
 
 // Define dependencies
 dependencies {
-    // Example dependency
     implementation "org.bytedeco:javacpp:1.5.10"
     implementation "org.bytedeco:llvm-platform:17.0.6-1.5.10"
+    implementation "org.antlr:antlr4:4.13.1"
     implementation files('lib/ArgPar-0.1.jar')
 }
 
