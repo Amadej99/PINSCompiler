@@ -3,3 +3,6 @@ __MACOSX
 *.class
 /out
 *.log
+/build
+/bin
+.gradle

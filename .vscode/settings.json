@@ -1,6 +1,0 @@
-{
-    "java.project.referencedLibraries": [
-        "lib/**/*.jar",
-        "PINSCompiler/lib/ArgPar-0.1.jar"
-    ]
-}
