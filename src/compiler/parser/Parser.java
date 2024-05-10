@@ -239,8 +239,10 @@ public class Parser {
 					if (si.getNext().equals(OP_COLON)) {
 						si.skip();
 						var type = parseType();
-						return new FunDef(new Position(start.position.start, type.position.end), name, params,
-								type, null, isVarArg);
+						return new FunDef(new Position(start.position.start, type.position.end), name,
+								params.stream().allMatch(param -> param == null) ? Optional.empty()
+										: Optional.of(params),
+								type, Optional.empty(), isVarArg);
 					} else {
 						Report.error(si.getSymbol().position, "Pricakoval :");
 						return null;
@@ -270,10 +272,9 @@ public class Parser {
 				si.skip();
 				var empty_list = new ArrayList<Parameter>();
 				var params = parseParameters(empty_list);
-				params.stream().filter(param -> param instanceof VarArg);
-				for (Parameter param : params)
-					if (param instanceof VarArg)
-						Report.error("Variabilno število argumentov je dovoljeno le pri uvoženih funkcijah: " + name);
+				if (params.stream().anyMatch(param -> param instanceof VarArg))
+					Report.error("Variabilno število argumentov je dovoljeno le pri uvoženih funkcijah: " + name);
+
 				if (si.getNext().equals(OP_RPARENT)) {
 					si.skip();
 					if (si.getNext().equals(OP_COLON)) {
@@ -282,8 +283,10 @@ public class Parser {
 						if (si.getNext().equals(OP_ASSIGN)) {
 							si.skip();
 							var expr = parseExpression();
-							return new FunDef(new Position(start.position.start, expr.position.end), name, params,
-									type, expr, false);
+							return new FunDef(new Position(start.position.start, expr.position.end), name,
+									params.stream().allMatch(param -> param == null) ? Optional.empty()
+											: Optional.of(params),
+									type, Optional.of(expr), false);
 						} else {
 							Report.error(si.getSymbol().position, "Pricakoval =");
 							return null;
@@ -331,7 +334,6 @@ public class Parser {
 			si.skip();
 			return new VarArg(new Position(s.position.start, s.position.end), "varArg", null);
 		} else {
-			Report.error(si.getSymbol().position, "Pricakoval identifier ali ...");
 			return null;
 		}
 	}
@@ -612,20 +614,9 @@ public class Parser {
 
 	Expr parseAtomExpression2(Name left) {
 		if (si.getNext().equals(OP_LPARENT)) {
-			dump("atom_expression2 -> ( expressions )");
+			dump("atom_expression2 -> ( atom_expression5");
 			si.skip();
-			var empty_list = new ArrayList<Expr>();
-			var args = parseExpressions(empty_list);
-			if (si.getNext().equals(OP_RPARENT)) {
-				Symbol end = si.getSymbol();
-				si.skip();
-				return new Call(new Position(left.position.start, end.position.end), args,
-						left.name);
-			} else {
-				Report.error(si.getSymbol().position, "Pricakoval ) dobil " +
-						si.getSymbol());
-				return null;
-			}
+			return parseAtomExpression5(left);
 		} else {
 			dump("atom_expression2 -> e");
 			return left;
@@ -773,6 +764,29 @@ public class Parser {
 				}
 			} else {
 				Report.error(si.getSymbol().position, "Pricakoval = dobil " +
+						si.getSymbol());
+				return null;
+			}
+		}
+	}
+
+	Expr parseAtomExpression5(Name left) {
+		Symbol s = si.getSymbol();
+
+		if (si.getNext().equals(OP_RPARENT)) {
+			si.skip();
+			return new Call(new Position(left.position.start, s.position.end), Optional.empty(),
+					left.name);
+		} else {
+			var empty_list = new ArrayList<Expr>();
+			var args = parseExpressions(empty_list);
+			if (si.getNext().equals(OP_RPARENT)) {
+				Symbol end = si.getSymbol();
+				si.skip();
+				return new Call(new Position(left.position.start, end.position.end), Optional.of(args),
+						left.name);
+			} else {
+				Report.error(si.getSymbol().position, "Pricakoval ) dobil " +
 						si.getSymbol());
 				return null;
 			}

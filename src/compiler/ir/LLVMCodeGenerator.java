@@ -103,26 +103,26 @@ public class LLVMCodeGenerator implements Visitor {
     public void visit(Call call) {
         var calledFunction = LLVMGetNamedFunction(module, call.name);
 
-//        System.out.println(LLVMPrintValueToString(calledFunction).getString());
-
-        call.arguments.forEach(argument -> argument.accept(this));
+        call.arguments.ifPresent(arguments -> arguments.forEach(argument -> argument.accept(this)));
 
         var calledFunctionParameterSize = 0;
 
         if (LLVMIsFunctionVarArg(functionTypes.get(call.name)) == 1)
-            calledFunctionParameterSize = call.arguments.size();
+            calledFunctionParameterSize = call.arguments.get().size();
         else
             calledFunctionParameterSize = LLVMCountParams(calledFunction);
 
-        var arguments = new PointerPointer<>(calledFunctionParameterSize);
+        var argumentsPointer = new PointerPointer<>(calledFunctionParameterSize);
 
-        IntStream.range(0, calledFunctionParameterSize).forEach(i -> {
-            IRNodes.valueFor(call.arguments.get(i)).ifPresent(value -> {
-                arguments.put(i, value);
+        call.arguments.ifPresent(arguments -> {
+            IntStream.range(0, call.arguments.get().size()).forEach(i -> {
+                IRNodes.valueFor(arguments.get(i)).ifPresent(value -> {
+                    argumentsPointer.put(i, value);
+                });
             });
         });
 
-        IRNodes.store(LLVMBuildCall2(builder, functionTypes.get(call.name), calledFunction, arguments,
+        IRNodes.store(LLVMBuildCall2(builder, functionTypes.get(call.name), calledFunction, argumentsPointer,
                 calledFunctionParameterSize, call.name), call);
     }
 
@@ -305,7 +305,7 @@ public class LLVMCodeGenerator implements Visitor {
         types.valueFor(name).ifPresent(type -> {
             if (type.isArray()) {
                 IRNodes.store(alloca, name);
-            } else{
+            } else {
                 IRNodes.store(LLVMBuildLoad2(builder, type.convertToLLVMType(context), alloca, name.name), name);
             }
         });
@@ -437,7 +437,7 @@ public class LLVMCodeGenerator implements Visitor {
             defs.definitions.forEach(def -> {
                 if (def instanceof VarDef)
                     def.accept(this);
-                if(def instanceof FunDef funDef)
+                if (def instanceof FunDef funDef)
                     declareFunction(funDef);
             });
             defs.definitions.forEach(def -> {
@@ -450,20 +450,23 @@ public class LLVMCodeGenerator implements Visitor {
             defs.definitions.forEach(def -> def.accept(this));
     }
 
-    private void declareFunction(FunDef funDef){
-        var parameterTypes = new PointerPointer<>(funDef.parameters.size());
+    private void declareFunction(FunDef funDef) {
+        var paramCount = funDef.parameters.isPresent() ? funDef.parameters.get().size() : 0;
+        var parameterTypes = new PointerPointer<>(paramCount);
 
-        IntStream.range(0, funDef.parameters.size()).forEach(i -> {
-            Parameter parameter = funDef.parameters.get(i);
-            types.valueFor(parameter.type).ifPresent(type -> {
-                parameterTypes.put(i, type.convertToLLVMType(context));
+        funDef.parameters.ifPresent(parameters -> {
+            IntStream.range(0, parameters.size()).forEach(i -> {
+                Parameter parameter = funDef.parameters.get().get(i);
+                types.valueFor(parameter.type).ifPresent(type -> {
+                    parameterTypes.put(i, type.convertToLLVMType(context));
+                });
             });
         });
 
         var returnType = types.valueFor(funDef.type).get();
         var LLVMReturnType = returnType.convertToLLVMType(context);
 
-        var functionType = LLVMFunctionType(LLVMReturnType, parameterTypes, funDef.parameters.size(),
+        var functionType = LLVMFunctionType(LLVMReturnType, parameterTypes, paramCount,
                 funDef.isVarArg ? 1 : 0);
 
         functionTypes.put(funDef.name, functionType);
@@ -474,34 +477,36 @@ public class LLVMCodeGenerator implements Visitor {
     public void visit(FunDef funDef) {
         var function = LLVMGetNamedFunction(module, funDef.name);
 
-        if(function == null)
+        if (function == null)
             Report.error("Funkcija " + funDef.name + " ni deklarirana!");
 
-        if (funDef.body == null)
-            return;
+        funDef.body.ifPresent(body -> {
+            var entry = LLVMAppendBasicBlockInContext(context, function, "entry");
+            LLVMPositionBuilderAtEnd(builder, entry);
 
-        var entry = LLVMAppendBasicBlockInContext(context, function, "entry");
-        LLVMPositionBuilderAtEnd(builder, entry);
+            var oldNameValues = NamedValues.entrySet().stream()
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
-        var oldNameValues = NamedValues.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+            funDef.parameters.ifPresent(parameters -> {
+                IntStream.range(0, parameters.size()).forEach(i -> {
+                    var parameter = funDef.parameters.get().get(i);
+                    var parameterType = types.valueFor(parameter.type).get().convertToLLVMType(context);
+                    var alloca = LLVMBuildAlloca(builder, parameterType, parameter.name);
+                    LLVMBuildStore(builder, LLVMGetParam(function, i), alloca);
+                    NamedValues.put(parameter.name, alloca);
+                });
+            });
 
-        IntStream.range(0, funDef.parameters.size()).forEach(i -> {
-            var parameter = funDef.parameters.get(i);
-            var parameterType = types.valueFor(parameter.type).get().convertToLLVMType(context);
-            var alloca = LLVMBuildAlloca(builder, parameterType, parameter.name);
-            LLVMBuildStore(builder, LLVMGetParam(function, i), alloca);
-            NamedValues.put(parameter.name, alloca);
+            body.accept(this);
+
+            NamedValues = (HashMap<String, LLVMValueRef>) oldNameValues;
+
+            var returnedValue = IRNodes.valueFor(body).get();
+            LLVMBuildRet(builder, returnedValue);
+
+            if (LLVMVerifyFunction(function, LLVMPrintMessageAction) > 0)
+                Report.error("Napačno zgrajena funkcija " + funDef.name + "!");
         });
-
-        funDef.body.accept(this);
-
-        NamedValues = (HashMap<String, LLVMValueRef>) oldNameValues;
-
-        var returnedValue = IRNodes.valueFor(funDef.body).get();
-        LLVMBuildRet(builder, returnedValue);
-
-        if (LLVMVerifyFunction(function, LLVMPrintMessageAction) > 0)
-            Report.error("Napačno zgrajena funkcija " + funDef.name + "!");
     }
 
     @Override

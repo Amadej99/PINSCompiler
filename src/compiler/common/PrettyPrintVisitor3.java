@@ -83,7 +83,7 @@ public class PrettyPrintVisitor3 implements Visitor {
         inNewScope(() -> {
             printDefinedAt(call);
             printTypedAs(call);
-            call.arguments.forEach((arg) -> arg.accept(this));
+            call.arguments.ifPresent(arguments -> arguments.forEach((arg) -> arg.accept(this)));
         });
     }
 
@@ -191,9 +191,9 @@ public class PrettyPrintVisitor3 implements Visitor {
         println("FunDef", funDef, funDef.name);
         inNewScope(() -> {
             printTypedAs(funDef);
-            visit(funDef.parameters);
+            funDef.parameters.ifPresent(parameters -> visit(parameters));
             funDef.type.accept(this);
-            funDef.body.accept(this);
+            funDef.body.ifPresent(body -> body.accept(this));
         });
     }
 

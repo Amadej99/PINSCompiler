@@ -10,7 +10,6 @@ import static common.RequireNonNull.requireNonNull;
 import java.util.ArrayList;
 import java.util.HashSet;
 
-import common.Constants;
 import common.Report;
 import compiler.common.Visitor;
 import compiler.parser.ast.def.*;
@@ -44,16 +43,16 @@ public class TypeChecker implements Visitor {
     @Override
     public void visit(Call call) {
         // Acceptaj argumente
-        call.arguments.stream().forEach(argument -> argument.accept(this));
+        call.arguments.ifPresent(arguments -> arguments.stream().forEach(argument -> argument.accept(this)));
 
         var argumentTypes = new ArrayList<Type>();
 
         // Ce se tipi argumentov ujemajo jih dodaj v seznam tipov argumentov
-        call.arguments.stream().forEach(argument -> {
+        call.arguments.ifPresent(arguments -> arguments.stream().forEach(argument -> {
             types.valueFor(argument).ifPresentOrElse(type -> {
                 argumentTypes.add(type);
             }, () -> Report.error(call.position, "Napacen tip v argumentu!"));
-        });
+        }));
 
         // Preveri ali je funkcija definirana
         var def = definitions.valueFor(call);
@@ -309,16 +308,16 @@ public class TypeChecker implements Visitor {
     @Override
     public void visit(FunDef funDef) {
         // Sprejmi parametre
-        funDef.parameters.stream().forEach(param -> param.accept(this));
+        funDef.parameters.ifPresent(parameters -> parameters.forEach(param -> param.accept(this)));
         // Sprejmi funkcijski tip
         funDef.type.accept(this);
 
         var parameterTypes = new ArrayList<Type>();
         // Preveri tip parametrov
-        funDef.parameters.stream().forEach(param -> {
+        funDef.parameters.ifPresent(parameters -> parameters.stream().forEach(param -> {
             types.valueFor(param).ifPresentOrElse(type -> parameterTypes.add(type),
                     () -> Report.error(funDef.position, "Napaka v tipu parametra!"));
-        });
+        }));
 
         // Preveri tip funkcije
         types.valueFor(funDef.type).ifPresentOrElse(
@@ -326,9 +325,9 @@ public class TypeChecker implements Visitor {
                 () -> Report.error(funDef.type.position, "Napaka v tipih funkcije"));
 
         // Preveri tip telesa funkcije
-        if (funDef.body != null) {
-            funDef.body.accept(this);
-            types.valueFor(funDef.body).ifPresentOrElse(funBodyType -> {
+        funDef.body.ifPresent(body -> {
+            body.accept(this);
+            types.valueFor(body).ifPresentOrElse(funBodyType -> {
                 // Preveri tip telesa funkcije
                 types.valueFor(funDef.type).ifPresent(funType -> {
                     // Preveri ali se tipa ujemata
@@ -338,8 +337,9 @@ public class TypeChecker implements Visitor {
                     } else
                         Report.error(funDef.type.position, "Neveljaven return type v funkciji!");
                 });
-            }, () -> Report.error(funDef.body.position, "Napaka v body funkcije!"));
-        }
+            }, () -> Report.error(body.position, "Napaka v body funkcije!"));
+
+        });
     }
 
     @Override
