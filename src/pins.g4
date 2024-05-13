@@ -82,11 +82,12 @@ type : identifier
 
 parameters : parameter parameters2;
 
-parameters2 : ',' parameter parameters2
+parameters2 : ',' parameters
             |;
 
 parameter : identifier ':' type
-          | '...';
+          | '...'
+          |;
 
 expression : logical_ior_expression expression2;
 
@@ -143,7 +144,8 @@ atom_expression : log_constant
                 | '(' expressions ')'
                 | '{' atom_expression4;
 
-atom_expression2 : '(' expressions ')'
+atom_expression2 : '('')'
+                 | '(' expressions ')'
                  |;
 
 atom_expression3 : 'else' expression '}'
@@ -157,7 +159,7 @@ atom_expression4 : expression '=' expression '}'
 
 expressions : expression expressions2;
 
-expressions2 : ',' expression expressions2
+expressions2 : ',' expressions
              |;
 
 integer : AT_INTEGER;
