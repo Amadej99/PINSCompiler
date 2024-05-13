@@ -1,11 +1,4 @@
-declare printf(_ : string, ...) : integer;
+var x : integer;
+typ z : integer;
 
-fun loop(x : integer) : string = (
-    'Hello, World!'
-);
-
-fun main( argc : integer ) : integer = (
-    { x = 5 },
-    { result = loop(x) },
-    printf('%s\n', result)
-) { where var x : integer; var result : string }
+declare printf( x : integer ) : integer

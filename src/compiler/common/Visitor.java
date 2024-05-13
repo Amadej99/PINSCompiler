@@ -31,7 +31,8 @@ public interface Visitor {
     void visit(FunDef funDef);
     void visit(TypeDef typeDef);
     void visit(VarDef varDef);
-    void visit(FunDef.Parameter parameter);
+    void visit(FunDef.Parameters parameters);
+    void visit(FunDef.Parameters.Parameter parameter);
 
     /**
      * Tipi.

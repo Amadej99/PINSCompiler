@@ -20,7 +20,7 @@ public class FunDef extends Def {
     /**
      * Parametri.
      */
-    public final Optional<List<Parameter>> parameters;
+    public final Optional<Parameters> parameters;
 
     /**
      * Tip rezultata.
@@ -37,7 +37,7 @@ public class FunDef extends Def {
      */
     public final boolean isVarArg;
 
-    public FunDef(Position position, String name, Optional<List<Parameter>> parameters, Type type, Optional<Expr> body, boolean isVarArg) {
+    public FunDef(Position position, String name, Optional<Parameters> parameters, Type type, Optional<Expr> body, boolean isVarArg) {
         super(position, name);
         requireNonNull(type);
         this.parameters = parameters;
@@ -51,7 +51,12 @@ public class FunDef extends Def {
         visitor.visit(this);
     }
 
-    /**
+    public static class Parameters extends Defs {
+        public Parameters(Position position, List<Def> parameters){
+            super(position, parameters);
+        }
+
+        /**
      * Parameter funkcije.
      */
     public static class Parameter extends Def {
@@ -85,5 +90,6 @@ public class FunDef extends Def {
         public void accept(Visitor visitor) {
             super.accept(visitor);
         }
+    }
     }
 }

@@ -39,12 +39,12 @@ public class PrettyPrintVisitor3 implements Visitor {
     private PrintStream stream;
 
     /**
-     * Razrešena imena. 
+     * Razrešena imena.
      */
     public Optional<NodeDescription<Def>> definitions = Optional.empty();
 
     /**
-     * Razrešeni podatkovni tipi. 
+     * Razrešeni podatkovni tipi.
      */
     public Optional<NodeDescription<Type>> types = Optional.empty();
 
@@ -52,7 +52,7 @@ public class PrettyPrintVisitor3 implements Visitor {
      * Ustvari novo instanco.
      * 
      * @param increaseIndentBy za koliko naj se poveča indentacija pri gnezdenju.
-     * @param stream izhodni tok.
+     * @param stream           izhodni tok.
      */
     public PrettyPrintVisitor3(int increaseIndentBy, PrintStream stream) {
         requireNonNull(stream);
@@ -182,7 +182,9 @@ public class PrettyPrintVisitor3 implements Visitor {
     public void visit(Defs defs) {
         println("Defs", defs);
         inNewScope(() -> {
-            defs.definitions.forEach((def) -> def.accept(this));
+            defs.definitions.forEach((def) -> {
+                def.accept(this);
+            });
         });
     }
 
@@ -191,7 +193,9 @@ public class PrettyPrintVisitor3 implements Visitor {
         println("FunDef", funDef, funDef.name);
         inNewScope(() -> {
             printTypedAs(funDef);
-            funDef.parameters.ifPresent(parameters -> visit(parameters));
+            funDef.parameters.ifPresent(parameters -> parameters.definitions.forEach(parameter -> {
+                parameter.accept(this);
+            }));
             funDef.type.accept(this);
             funDef.body.ifPresent(body -> body.accept(this));
         });
@@ -216,8 +220,13 @@ public class PrettyPrintVisitor3 implements Visitor {
     }
 
     @Override
-    public void visit(FunDef.Parameter parameter) {
-        println("Parameter", parameter, parameter.name);
+    public void visit(FunDef.Parameters parameters){
+        
+    }
+
+    @Override
+    public void visit(FunDef.Parameters.Parameter parameter) {
+        println("Parameters", parameter, parameter.name);
         inNewScope(() -> {
             printTypedAs(parameter);
             parameter.type.accept(this);
@@ -260,7 +269,7 @@ public class PrettyPrintVisitor3 implements Visitor {
             node.accept(this);
         });
     }
-    
+
     // ----------------------------------
 
     /**
