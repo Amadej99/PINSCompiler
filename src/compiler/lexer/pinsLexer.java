@@ -1,6 +1,4 @@
-package compiler.lexer;
-
-// Generated from /home/amadej/pinscompiler/src/pins.g4 by ANTLR 4.13.1
+package compiler.lexer;// Generated from /home/amadej/PINSCompiler/src/pins.g4 by ANTLR 4.13.1
 
 import org.antlr.v4.runtime.Lexer;
 import org.antlr.v4.runtime.*;

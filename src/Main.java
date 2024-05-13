@@ -7,11 +7,11 @@
 import cli.PINS;
 import cli.PINS.Phase;
 import compiler.common.PrettyPrintVisitor3;
+import compiler.common.antlr.pinsParser;
 import compiler.ir.LLVMCodeGenerator;
 import compiler.lexer.pinsLexer;
 import compiler.parser.ast.def.Def;
 import compiler.parser.pinsAstVisitor;
-import compiler.parser.pinsParser;
 import compiler.seman.common.NodeDescription;
 import compiler.seman.name.NameChecker;
 import compiler.seman.name.env.FastSymbolTable;
