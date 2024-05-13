@@ -186,7 +186,15 @@ public class PrettyPrintVisitor1 implements Visitor {
     }
 
     @Override
-    public void visit(FunDef.Parameter parameter) {
+    public void visit(FunDef.Parameters parameters) {
+        println("Parameters", parameters);
+        inNewScope(() -> {
+            parameters.definitions.forEach((param) -> param.accept(this));
+        });
+    }
+
+    @Override
+    public void visit(FunDef.Parameters.Parameter parameter) {
         println("Parameter", parameter, parameter.name);
         inNewScope(() -> {
             parameter.type.accept(this);

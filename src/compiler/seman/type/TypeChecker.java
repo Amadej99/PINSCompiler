@@ -13,7 +13,8 @@ import java.util.HashSet;
 import common.Report;
 import compiler.common.Visitor;
 import compiler.parser.ast.def.*;
-import compiler.parser.ast.def.FunDef.Parameter;
+import compiler.parser.ast.def.FunDef.Parameters;
+import compiler.parser.ast.def.FunDef.Parameters.Parameter;
 import compiler.parser.ast.expr.*;
 import compiler.parser.ast.expr.Unary.Operator;
 import compiler.parser.ast.type.*;
@@ -308,13 +309,13 @@ public class TypeChecker implements Visitor {
     @Override
     public void visit(FunDef funDef) {
         // Sprejmi parametre
-        funDef.parameters.ifPresent(parameters -> parameters.forEach(param -> param.accept(this)));
+        funDef.parameters.ifPresent(parameters -> parameters.accept(this));
         // Sprejmi funkcijski tip
         funDef.type.accept(this);
 
         var parameterTypes = new ArrayList<Type>();
         // Preveri tip parametrov
-        funDef.parameters.ifPresent(parameters -> parameters.stream().forEach(param -> {
+        funDef.parameters.ifPresent(parameters -> parameters.definitions.stream().forEach(param -> {
             types.valueFor(param).ifPresentOrElse(type -> parameterTypes.add(type),
                     () -> Report.error(funDef.position, "Napaka v tipu parametra!"));
         }));
@@ -370,8 +371,16 @@ public class TypeChecker implements Visitor {
                 "Tip spremenljivke " + varDef.name + " ni definiran!"));
     }
 
+
     @Override
-    public void visit(Parameter parameter) {
+    public void visit(Parameters parameters) {
+        parameters.definitions.stream().forEach(parameter -> {
+            parameter.accept(this);
+        });
+    }
+
+    @Override
+    public void visit(FunDef.Parameters.Parameter parameter) {
         // Sprejmi tip parametra
         parameter.type.accept(this);
         // Preveri ali je tip definiran

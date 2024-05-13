@@ -56,6 +56,11 @@ public class FunDef extends Def {
             super(position, parameters);
         }
 
+        @Override
+        public void accept(Visitor visitor) {
+            visitor.visit(this);
+        }
+
         /**
      * Parameter funkcije.
      */
@@ -82,8 +87,8 @@ public class FunDef extends Def {
      * Se ne pojavi v končnem AST.
      */
     public static class VarArg extends Parameter {
-        public VarArg(Position position, String name, Type type) {
-            super(position, name, type);
+        public VarArg(Position position, String name) {
+            super(position, name, null);
         }
 
         @Override

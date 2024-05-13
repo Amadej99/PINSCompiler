@@ -193,9 +193,7 @@ public class PrettyPrintVisitor3 implements Visitor {
         println("FunDef", funDef, funDef.name);
         inNewScope(() -> {
             printTypedAs(funDef);
-            funDef.parameters.ifPresent(parameters -> parameters.definitions.forEach(parameter -> {
-                parameter.accept(this);
-            }));
+            funDef.parameters.ifPresent(parameters -> parameters.accept(this));
             funDef.type.accept(this);
             funDef.body.ifPresent(body -> body.accept(this));
         });
@@ -221,12 +219,17 @@ public class PrettyPrintVisitor3 implements Visitor {
 
     @Override
     public void visit(FunDef.Parameters parameters){
-        
+        println("Parameters", parameters);
+        inNewScope(() -> {
+            parameters.definitions.forEach(parameter -> {
+                parameter.accept(this);
+            });
+        });
     }
 
     @Override
     public void visit(FunDef.Parameters.Parameter parameter) {
-        println("Parameters", parameter, parameter.name);
+        println("Parameter", parameter, parameter.name);
         inNewScope(() -> {
             printTypedAs(parameter);
             parameter.type.accept(this);

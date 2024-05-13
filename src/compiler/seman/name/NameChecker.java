@@ -11,7 +11,7 @@ import common.Constants;
 import common.Report;
 import compiler.common.Visitor;
 import compiler.parser.ast.def.*;
-import compiler.parser.ast.def.FunDef.Parameter;
+import compiler.parser.ast.def.FunDef.Parameters;
 import compiler.parser.ast.expr.*;
 import compiler.parser.ast.type.*;
 import compiler.seman.common.NodeDescription;
@@ -143,13 +143,12 @@ public class NameChecker implements Visitor {
         // Sprejmi tip funkcije in tip parametrov
         funDef.type.accept(this);
 
-        funDef.parameters.ifPresent(params -> {
-            params.forEach(parameter -> parameter.accept(this));
-        });
+        funDef.parameters.ifPresent(parameters -> parameters.accept(this));
+
         // Sprejmi telo funkcije in parametre v novem scope-u
         symbolTable.inNewScope(() -> {
-            funDef.parameters.ifPresent(params -> {
-                params.forEach(parameter -> parameter.accept(this));
+            funDef.parameters.ifPresent(parameters -> {
+                parameters.accept(this);
             });
             funDef.body.ifPresent(body -> body.accept(this));
         });
@@ -166,7 +165,12 @@ public class NameChecker implements Visitor {
     }
 
     @Override
-    public void visit(Parameter parameter) {
+    public void visit(FunDef.Parameters parameters) {
+        parameters.definitions.forEach(parameter -> parameter.accept(this));
+    }
+
+    @Override
+    public void visit(FunDef.Parameters.Parameter parameter) {
         // Preveri ali je parameter ze definiran
         try {
             symbolTable.insert(parameter);
@@ -193,7 +197,7 @@ public class NameChecker implements Visitor {
                 Report.error(name.position + " " + name.identifier + " je spremenljvka, ne tip!");
             } else if (value instanceof FunDef) {
                 Report.error(name.position + " " + name.identifier + " je funkcija, ne tip!");
-            } else if (value instanceof Parameter) {
+            } else if (value instanceof FunDef.Parameters.Parameter) {
                 Report.error(name.position + " " + name.identifier + " je parameter, ne tip!");
             } else
                 definitions.store(value, name);
