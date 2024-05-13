@@ -17,7 +17,8 @@ import compiler.common.Visitor;
 import compiler.parser.ast.def.Def;
 import compiler.parser.ast.def.Defs;
 import compiler.parser.ast.def.FunDef;
-import compiler.parser.ast.def.FunDef.Parameter;
+import compiler.parser.ast.def.FunDef.Parameters;
+import compiler.parser.ast.def.FunDef.Parameters.Parameter;
 import compiler.parser.ast.def.TypeDef;
 import compiler.parser.ast.def.VarDef;
 import compiler.parser.ast.expr.Binary;
@@ -451,12 +452,12 @@ public class LLVMCodeGenerator implements Visitor {
     }
 
     private void declareFunction(FunDef funDef) {
-        var paramCount = funDef.parameters.isPresent() ? funDef.parameters.get().size() : 0;
+        var paramCount = funDef.parameters.isPresent() ? funDef.parameters.get().definitions.size() : 0;
         var parameterTypes = new PointerPointer<>(paramCount);
 
         funDef.parameters.ifPresent(parameters -> {
-            IntStream.range(0, parameters.size()).forEach(i -> {
-                Parameter parameter = funDef.parameters.get().get(i);
+            IntStream.range(0, parameters.definitions.size()).forEach(i -> {
+                Parameter parameter = (Parameter) funDef.parameters.get().definitions.get(i);
                 types.valueFor(parameter.type).ifPresent(type -> {
                     parameterTypes.put(i, type.convertToLLVMType(context));
                 });
@@ -488,8 +489,8 @@ public class LLVMCodeGenerator implements Visitor {
                     .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
             funDef.parameters.ifPresent(parameters -> {
-                IntStream.range(0, parameters.size()).forEach(i -> {
-                    var parameter = funDef.parameters.get().get(i);
+                IntStream.range(0, parameters.definitions.size()).forEach(i -> {
+                    var parameter = (Parameter) funDef.parameters.get().definitions.get(i);
                     var parameterType = types.valueFor(parameter.type).get().convertToLLVMType(context);
                     var alloca = LLVMBuildAlloca(builder, parameterType, parameter.name);
                     LLVMBuildStore(builder, LLVMGetParam(function, i), alloca);
@@ -553,6 +554,10 @@ public class LLVMCodeGenerator implements Visitor {
             }
             NamedValues.put(varDef.name, alloca);
         });
+    }
+
+    @Override
+    public void visit(Parameters parameters) {
     }
 
     @Override
