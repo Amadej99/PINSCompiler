@@ -1,0 +1,10 @@
+{
+    "antlr4.generation": {
+        "package": "compiler.common.antlr",
+        "language": "Java",
+        "mode": "external",
+        "listeners": false,
+        "visitors": true,
+        "outputDir": "./compiler/common/antlr",
+    }
+}
