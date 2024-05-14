@@ -14,7 +14,6 @@ import common.Report;
 import compiler.common.Visitor;
 import compiler.parser.ast.def.*;
 import compiler.parser.ast.def.FunDef.Parameters;
-import compiler.parser.ast.def.FunDef.Parameters.Parameter;
 import compiler.parser.ast.expr.*;
 import compiler.parser.ast.expr.Unary.Operator;
 import compiler.parser.ast.type.*;

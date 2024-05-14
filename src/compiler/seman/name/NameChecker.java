@@ -11,7 +11,6 @@ import common.Constants;
 import common.Report;
 import compiler.common.Visitor;
 import compiler.parser.ast.def.*;
-import compiler.parser.ast.def.FunDef.Parameters;
 import compiler.parser.ast.expr.*;
 import compiler.parser.ast.type.*;
 import compiler.seman.common.NodeDescription;

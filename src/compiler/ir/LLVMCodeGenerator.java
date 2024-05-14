@@ -14,7 +14,6 @@ import org.bytedeco.javacpp.PointerPointer;
 import org.bytedeco.javacpp.Pointer;
 
 import compiler.common.Visitor;
-import compiler.parser.ast.def.Def;
 import compiler.parser.ast.def.Defs;
 import compiler.parser.ast.def.FunDef;
 import compiler.parser.ast.def.FunDef.Parameters;
