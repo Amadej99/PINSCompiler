@@ -9,7 +9,7 @@ import cli.PINS.Phase;
 import compiler.common.PrettyPrintVisitor3;
 import compiler.common.antlr.pinsParser;
 import compiler.ir.LLVMCodeGenerator;
-import compiler.lexer.pinsLexer;
+import compiler.common.antlr.pinsLexer;
 import compiler.parser.ast.def.Def;
 import compiler.parser.pinsAstVisitor;
 import compiler.seman.common.NodeDescription;
