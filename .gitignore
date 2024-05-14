@@ -1,3 +1,11 @@
 __MACOSX
 .DS_Store
 *.class
+/out
+*.log
+/build
+/bin
+*.gradle
+*.exe
+*.o
+src/.antlr
