@@ -50,25 +50,40 @@ public class Binary extends Expr {
 	@Override public void accept(Visitor visitor) { visitor.visit(this); }
 
     public static enum Operator {
-        ADD,       // +
-        SUB,       // -
-        MUL,       // *
-        DIV,       // /
-        MOD,       // %
-    
-        AND,       // &
-        OR,        // |
+        ADD("+"),       // +
+        SUB("-"),       // -
+        MUL("*"),       // *
+        DIV("/"),       // /
+        MOD("%"),       // %
         
-        EQ,        // ==
-        NEQ,       // !=
-        LT,        // <
-        GT,        // >
-        LEQ,       // <=
-        GEQ,       // >=
-    
-        ASSIGN,     // =
+        AND("&"),       // &
+        OR("|"),        // |
+        
+        EQ("=="),       // ==
+        NEQ("!="),      // !=
+        LT("<"),        // <
+        GT(">"),        // >
+        LEQ("<="),      // <=
+        GEQ(">="),      // >=
+        
+        ASSIGN("="),    // =
+        
+        ARR("[]");      // a[indeks]
 
-        ARR;        // a[indeks]
+        public final String symbol;
+
+        private Operator(String symbol) {
+            this.symbol = symbol;
+        }
+
+        public static Operator fromSymbol(String symbol) {
+            for (Operator op : Operator.values()) {
+                if (op.symbol.equals(symbol)) {
+                    return op;
+                }
+            }
+            return null;
+        }
 
         public boolean isAndOr() {
             return this == AND || this == OR;

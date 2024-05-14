@@ -32,6 +32,23 @@ public class Unary extends Expr {
 	@Override public void accept(Visitor visitor) { visitor.visit(this); }
 
     public static enum Operator {
-        ADD, SUB, NOT
+        ADD("+"), 
+        SUB("-"), 
+        NOT("!");
+
+        public final String symbol;
+
+        private Operator(String symbol) {
+            this.symbol = symbol;
+        }
+
+        public static Operator fromSymbol(String symbol) {
+            for (Operator op : Operator.values()) {
+                if (op.symbol.equals(symbol)) {
+                    return op;
+                }
+            }
+            return null;
+        }
     }
 }
