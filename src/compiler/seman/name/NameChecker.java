@@ -11,6 +11,7 @@ import common.Constants;
 import common.Report;
 import compiler.common.Visitor;
 import compiler.parser.ast.def.*;
+import compiler.parser.ast.def.FunDef.Parameters.Parameter;
 import compiler.parser.ast.expr.*;
 import compiler.parser.ast.type.*;
 import compiler.seman.common.NodeDescription;
@@ -142,7 +143,12 @@ public class NameChecker implements Visitor {
         // Sprejmi tip funkcije in tip parametrov
         funDef.type.accept(this);
 
-        funDef.parameters.ifPresent(parameters -> parameters.accept(this));
+        funDef.parameters.ifPresent(parameters -> {
+            parameters.definitions.stream().forEach(parameter -> {
+                var asParameter = (Parameter) parameter;
+                asParameter.type.accept(this);
+            });
+        });
 
         // Sprejmi telo funkcije in parametre v novem scope-u
         symbolTable.inNewScope(() -> {
