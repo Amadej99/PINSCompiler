@@ -293,8 +293,13 @@ public class pinsAstVisitor extends pinsParserBaseVisitor<Ast> {
         var left = visitAtom_expression(ctx.atom_expression());
         var right = visitPostfix_expression2(ctx.postfix_expression2());
 
-        if (right != null)
+        if (right != null) {
+            if (right instanceof Binary rightBinary) {
+                var createdBinary = new Binary(getContextPosition(ctx), left, Binary.Operator.ARR, rightBinary.left);
+                return new Binary(getContextPosition(ctx), createdBinary, Binary.Operator.ARR, rightBinary.right);
+            }
             return new Binary(getContextPosition(ctx), left, Binary.Operator.ARR, right);
+        }
 
         return left;
     }
@@ -307,7 +312,6 @@ public class pinsAstVisitor extends pinsParserBaseVisitor<Ast> {
 
             if (right != null)
                 return new Binary(getContextPosition(ctx), expr, Binary.Operator.ARR, right);
-
             return expr;
         }
 
