@@ -11,6 +11,7 @@ import compiler.common.antlr.pinsParser;
 import compiler.ir.LLVMCodeGenerator;
 import compiler.common.antlr.pinsLexer;
 import compiler.parser.ast.def.Def;
+import compiler.parser.PinsErrorListener;
 import compiler.parser.pinsAstVisitor;
 import compiler.seman.common.NodeDescription;
 import compiler.seman.name.NameChecker;
@@ -83,6 +84,8 @@ public class Main {
                  ? Optional.of(System.out)
                  : Optional.empty();
          var parser = new pinsParser(tokens);
+         parser.removeErrorListeners();
+         parser.addErrorListener(new PinsErrorListener());
          var ast = visitor.visitProgram(parser.program());
          if (cli.execPhase == Phase.SYN) {
              return;
