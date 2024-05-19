@@ -189,93 +189,67 @@ public class pinsAstVisitor extends pinsParserBaseVisitor<Ast> {
     public Expr visitLogical_ior_expression2(Logical_ior_expression2Context ctx) {
         if (ctx.logical_ior_expression() != null)
             return visitLogical_ior_expression(ctx.logical_ior_expression());
-
         return null;
     }
 
     @Override
     public Expr visitLogical_and_expression(Logical_and_expressionContext ctx) {
         var left = visitCompare_expression(ctx.compare_expression());
-        var right = visitLogical_and_expression2(ctx.logical_and_expression2());
+        return visitLogical_and_expression2(ctx.logical_and_expression2(), left);
+    }
 
-        if (right != null)
+    private Expr visitLogical_and_expression2(Logical_and_expression2Context ctx, Expr left) {
+        if (ctx.logical_and_expression() != null) {
+            Expr right = visitLogical_and_expression(ctx.logical_and_expression());
             return new Binary(getContextPosition(ctx), left, Binary.Operator.AND, right);
-
-        return left;
+        }
+            return left;
     }
 
-    @Override
-    public Expr visitLogical_and_expression2(Logical_and_expression2Context ctx) {
-        if (ctx.logical_and_expression() != null)
-            return visitLogical_and_expression(ctx.logical_and_expression());
-
-        return null;
-    }
 
     @Override
     public Expr visitCompare_expression(Compare_expressionContext ctx) {
-        var left = visitAdditive_expression(ctx.additive_expression());
-        var rightBinary = visitCompare_expression2(ctx.compare_expression2());
-
-        if (rightBinary != null)
-            return new Binary(getContextPosition(ctx), left, rightBinary.operator, rightBinary.right);
-
-        return left;
+        Expr left = visitAdditive_expression(ctx.additive_expression());
+        return visitCompare_expression2(ctx.compare_expression2(), left);
     }
 
-    @Override
-    public Binary visitCompare_expression2(Compare_expression2Context ctx) {
+    private Expr visitCompare_expression2(Compare_expression2Context ctx, Expr left) {
         if (ctx.op != null) {
             var right = visitAdditive_expression(ctx.additive_expression());
-            return new Binary(getContextPosition(ctx), visitAdditive_expression(ctx.additive_expression()),
-                    Binary.Operator.fromSymbol(ctx.op.getText()), right);
+            return new Binary(getContextPosition(ctx), left, Binary.Operator.fromSymbol(ctx.op.getText()), right);
         }
-
-        return null;
+            return left;
     }
+
 
     @Override
     public Expr visitAdditive_expression(Additive_expressionContext ctx) {
         var left = visitMultiplicative_expression(ctx.multiplicative_expression());
-        var rightBinary = visitAdditive_expression2(ctx.additive_expression2());
-
-        if (rightBinary != null)
-            return new Binary(getContextPosition(ctx), left, rightBinary.operator, rightBinary.right);
-
-        return left;
+        return visitAdditive_expression2(ctx.additive_expression2(), left);
     }
 
-    @Override
-    public Binary visitAdditive_expression2(Additive_expression2Context ctx) {
+    private Expr visitAdditive_expression2(Additive_expression2Context ctx, Expr left) {
         if (ctx.op != null) {
-            var right = visitAdditive_expression(ctx.additive_expression());
-            return new Binary(getContextPosition(ctx), visitAdditive_expression(ctx.additive_expression()),
-                    Binary.Operator.fromSymbol(ctx.op.getText()), right);
+            var right = visitMultiplicative_expression(ctx.multiplicative_expression());
+            var bin = new Binary(getContextPosition(ctx), left, Binary.Operator.fromSymbol(ctx.op.getText()), right);
+            return visitAdditive_expression2(ctx.additive_expression2(), bin);
         }
-
-        return null;
+            return left;
     }
 
     @Override
     public Expr visitMultiplicative_expression(Multiplicative_expressionContext ctx) {
         var left = visitPrefix_expression(ctx.prefix_expression());
-        var rightBinary = visitMultiplicative_expression2(ctx.multiplicative_expression2());
-
-        if (rightBinary != null)
-            return new Binary(getContextPosition(ctx), left, rightBinary.operator, rightBinary.right);
-
-        return left;
+        return visitMultiplicative_expression2(ctx.multiplicative_expression2(), left);
     }
 
-    @Override
-    public Binary visitMultiplicative_expression2(Multiplicative_expression2Context ctx) {
-        if (ctx.op != null) {
-            var right = visitMultiplicative_expression(ctx.multiplicative_expression());
-            return new Binary(getContextPosition(ctx), visitMultiplicative_expression(ctx.multiplicative_expression()),
-                    Binary.Operator.fromSymbol(ctx.op.getText()), right);
+    public Expr visitMultiplicative_expression2(Multiplicative_expression2Context ctx, Expr left) {
+        if(ctx.prefix_expression() != null){
+            var right = visitPrefix_expression(ctx.prefix_expression());
+            var bin = new Binary(getContextPosition(ctx), left, Binary.Operator.fromSymbol(ctx.op.getText()), right);
+            return visitMultiplicative_expression2(ctx.multiplicative_expression2(), bin);
         }
-
-        return null;
+        return left;
     }
 
     @Override
@@ -284,39 +258,24 @@ public class pinsAstVisitor extends pinsParserBaseVisitor<Ast> {
             var expr = visitPrefix_expression(ctx.prefix_expression());
             return new Unary(getContextPosition(ctx), expr, Unary.Operator.fromSymbol(ctx.op.getText()));
         }
-
         return visitPostfix_expression(ctx.postfix_expression());
     }
 
     @Override
     public Expr visitPostfix_expression(Postfix_expressionContext ctx) {
-        var left = visitAtom_expression(ctx.atom_expression());
-        var right = visitPostfix_expression2(ctx.postfix_expression2());
+        Expr left = visitAtom_expression(ctx.atom_expression());
+        return visitPostfix_expression2(ctx.postfix_expression2(), left);
+    }
 
-        if (right != null) {
-            if (right instanceof Binary rightBinary) {
-                var createdBinary = new Binary(getContextPosition(ctx), left, Binary.Operator.ARR, rightBinary.left);
-                return new Binary(getContextPosition(ctx), createdBinary, Binary.Operator.ARR, rightBinary.right);
-            }
-            return new Binary(getContextPosition(ctx), left, Binary.Operator.ARR, right);
+    private Expr visitPostfix_expression2(Postfix_expression2Context ctx, Expr left) {
+        if (ctx.expression() != null) {
+            var right = visitExpression(ctx.expression());
+            var bin = new Binary(getContextPosition(ctx), left, Binary.Operator.ARR, right);
+            return visitPostfix_expression2(ctx.postfix_expression2(), bin);
         }
-
         return left;
     }
 
-    @Override
-    public Expr visitPostfix_expression2(Postfix_expression2Context ctx) {
-        if (ctx.expression() != null) {
-            var expr = visitExpression(ctx.expression());
-            var right = visitPostfix_expression2(ctx.postfix_expression2());
-
-            if (right != null)
-                return new Binary(getContextPosition(ctx), expr, Binary.Operator.ARR, right);
-            return expr;
-        }
-
-        return null;
-    }
 
     @Override
     public Expr visitAtom_expression(Atom_expressionContext ctx) {
@@ -331,7 +290,7 @@ public class pinsAstVisitor extends pinsParserBaseVisitor<Ast> {
             var expressions = visitAtom_expression2(ctx.atom_expression2());
 
             if (expressions instanceof Block block) {
-                var expressionList = new ArrayList<Expr>(block.expressions);
+                var expressionList = new ArrayList<>(block.expressions);
                 return new Call(getContextPosition(ctx),
                         expressionList.isEmpty() ? Optional.empty() : Optional.of(expressionList), name);
             }
