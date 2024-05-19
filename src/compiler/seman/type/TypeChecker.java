@@ -146,8 +146,7 @@ public class TypeChecker implements Visitor {
                 // Ce je operator prirejanje preveri, da se levi in desni tip ujemata in da sta
                 // oba logična, cela stevila ali nizi
             } else if (binary.operator.equals(Binary.Operator.ASSIGN)) {
-                if (leftType.get().equals(rightType.get()) && ((rightType.get().isLog()) || rightType.get().isInt()
-                        || rightType.get().isStr())) {
+                if (leftType.get().equals(rightType.get())) {
                     types.store(leftType.get(), binary);
                     return;
                 } else
