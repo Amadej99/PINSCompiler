@@ -5,21 +5,18 @@
 
 package compiler.seman.type.type;
 
-import static common.RequireNonNull.requireNonNull;
-import static org.bytedeco.llvm.global.LLVM.LLVMArrayType2;
-import static org.bytedeco.llvm.global.LLVM.LLVMInt1TypeInContext;
-import static org.bytedeco.llvm.global.LLVM.LLVMInt32TypeInContext;
-import static org.bytedeco.llvm.global.LLVM.LLVMPointerTypeInContext;
+import common.Constants;
+import common.Report;
+import compiler.parser.ast.type.Atom;
+import org.bytedeco.llvm.LLVM.LLVMContextRef;
+import org.bytedeco.llvm.LLVM.LLVMTypeRef;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.bytedeco.llvm.LLVM.LLVMContextRef;
-import org.bytedeco.llvm.LLVM.LLVMTypeRef;
-
-import common.Constants;
-import common.Report;
+import static common.RequireNonNull.requireNonNull;
+import static org.bytedeco.llvm.global.LLVM.*;
 
 public abstract class Type {
     /**
@@ -154,6 +151,17 @@ public abstract class Type {
         return type;
     }
 
+    public LLVMTypeRef dereferenceArray(int dereferenceCount, LLVMContextRef context){
+        var currentType = this;
+        for (int i = 0; i < dereferenceCount; i++) {
+            if(currentType.isAtom())
+                return currentType.convertToLLVMType(context);
+            else if(currentType.isArray())
+                currentType = currentType.asArray().get().type;
+        }
+        return currentType.convertToLLVMType(context);
+    }
+
     /**
      * Preveri, ali je tip funkcijski tip.
      */
@@ -183,6 +191,8 @@ public abstract class Type {
             return LLVMInt1TypeInContext(context);
         else if (this.isStr())
             return LLVMPointerTypeInContext(context, 0);
+        else if (this.isArray())
+            return resolveLLVMArrayType(this, resolveArrayLLVMAtomType(context, this));
         else
             return null;
     }

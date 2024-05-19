@@ -218,7 +218,10 @@ public class LLVMCodeGenerator implements Visitor {
 
             var gep = LLVMBuildInBoundsGEP2(builder, arrayType, NamedValues.get(name.name), indeces,
                     indecesAsList.size(), name.name);
-            var load = LLVMBuildLoad2(builder, arrayAtomType, gep, name.name);
+
+            var loadType = types.valueFor(name).get().dereferenceArray(indecesAsList.size() - 1, context);
+
+            var load = LLVMBuildLoad2(builder, loadType, gep, name.name);
             IRNodes.store(load, binary);
         }
     }
