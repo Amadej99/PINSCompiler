@@ -1,0 +1,19 @@
+declare printf(_ : string, ...) : integer;
+
+var a : arr[10] arr[5] integer;
+
+fun main() : integer =
+(
+    { n = 4 },
+    {array = f(n)},
+    { for i = 0, 5, 1 : printf('%d\n', a[4][i]) },
+    printf('\n'),
+    {if (n == 4) then { for i = 0, 5, 1 : printf('%d\n', array[i]) }},
+    0
+) { where var i : integer; var n : integer; var array : arr[5] integer};
+
+fun f(n : integer) : arr[5] integer =
+(
+    { for i = 0, 5, 1 : { a[n][i] = i } },
+    a[n]
+) { where var i : integer }
