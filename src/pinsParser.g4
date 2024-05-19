@@ -63,14 +63,14 @@ additive_expression:
 	multiplicative_expression additive_expression2;
 
 additive_expression2:
-	op = (OP_ADD | OP_SUB) additive_expression
+	op = (OP_ADD | OP_SUB) multiplicative_expression additive_expression2
 	|;
 
 multiplicative_expression:
 	prefix_expression multiplicative_expression2;
 
 multiplicative_expression2:
-	op = (OP_MUL | OP_DIV | OP_MOD) multiplicative_expression
+	op = (OP_MUL | OP_DIV | OP_MOD) prefix_expression multiplicative_expression2
 	|;
 
 prefix_expression:
@@ -91,7 +91,7 @@ atom_expression:
 
 atom_expression2: '(' ')' | '(' expressions ')' |;
 
-atom_expression3: ELSE expression '}' |;
+atom_expression3: ELSE expression '}' | '}';
 
 atom_expression4:
 	expression '=' expression '}'
