@@ -364,6 +364,8 @@ public class LLVMCodeGenerator implements Visitor {
 
             LLVMAddIncoming(phi, phiValues, phiBlocks, ifThenElse.elseExpression.isPresent() ? 2 : 1);
         }
+
+        IRNodes.store(IRNodes.valueFor(ifThenElse.thenExpression).get(), ifThenElse);
     }
 
     @Override
