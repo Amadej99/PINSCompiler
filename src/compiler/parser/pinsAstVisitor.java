@@ -17,6 +17,7 @@ import compiler.parser.ast.type.TypeName;
 import org.antlr.v4.runtime.ParserRuleContext;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 public class pinsAstVisitor extends pinsParserBaseVisitor<Ast> {
@@ -286,31 +287,28 @@ public class pinsAstVisitor extends pinsParserBaseVisitor<Ast> {
         if (ctx.C_STRING() != null)
             return new Literal(getContextPosition(ctx), ctx.C_STRING().getText().replace("'", ""), Atom.Type.STR);
         if (ctx.IDENTIFIER() != null) {
-            var name = ctx.IDENTIFIER().getText();
-            var expressions = visitAtom_expression2(ctx.atom_expression2());
-
-            if (expressions instanceof Block block) {
-                var expressionList = new ArrayList<>(block.expressions);
-                return new Call(getContextPosition(ctx),
-                        expressionList.isEmpty() ? Optional.empty() : Optional.of(expressionList), name);
-            }
-
-            return new Name(getContextPosition(ctx), ctx.IDENTIFIER().getText());
+            var name = new Name(getContextPosition(ctx), ctx.IDENTIFIER().getText());
+            return visitAtom_expression2(ctx.atom_expression2(), name);
         }
-        if (ctx.expressions() != null)
-            return visitExpressions(ctx.expressions());
+        if (ctx.expressions() != null){
+            var empty_list = new ArrayList<Expr>();
+            var expressions = visitExpressions(ctx.expressions(), empty_list);
+            return new Block(getContextPosition(ctx), expressions);
+        }
         if (ctx.atom_expression4() != null)
             return visitAtom_expression4(ctx.atom_expression4());
         return null;
     }
 
-    @Override
-    public Expr visitAtom_expression2(Atom_expression2Context ctx) {
-        if (ctx.expressions() != null)
-            return visitExpressions(ctx.expressions());
+    public Expr visitAtom_expression2(Atom_expression2Context ctx, Name name) {
+        if (ctx.expressions() != null){
+            var empty_list = new ArrayList<Expr>();
+            var arguments = visitExpressions(ctx.expressions(), empty_list);
+            return new Call(getContextPosition(ctx), Optional.of(arguments), name.name);
+        }
         if (ctx.OP_LPARENT() != null && ctx.OP_RPARENT() != null)
-            return new Block(getContextPosition(ctx), new ArrayList<>());
-        return null;
+            return new Call(getContextPosition(ctx), Optional.empty(), name.name);
+        return name;
     }
 
     @Override
@@ -356,21 +354,16 @@ public class pinsAstVisitor extends pinsParserBaseVisitor<Ast> {
         return null;
     }
 
-    @Override
-    public Block visitExpressions(ExpressionsContext ctx) {
-        var expressions = new ArrayList<Expr>();
-        expressions.add(visitExpression(ctx.expression()));
-        var expressions2 = visitExpressions2(ctx.expressions2());
-        if (!expressions2.expressions.isEmpty())
-            expressions.addAll(expressions2.expressions);
-        return new Block(getContextPosition(ctx), expressions);
+    public List<Expr> visitExpressions(ExpressionsContext ctx, List<Expr> args) {
+        var arg = visitExpression(ctx.expression());
+        args.add(arg);
+        return visitExpressions2(ctx.expressions2(), args);
     }
 
-    @Override
-    public Block visitExpressions2(Expressions2Context ctx) {
+    public List<Expr> visitExpressions2(Expressions2Context ctx, List<Expr> args) {
         if (ctx.expressions() != null)
-            return visitExpressions(ctx.expressions());
-        return new Block(getContextPosition(ctx), new ArrayList<>());
+            return visitExpressions(ctx.expressions(), args);
+        return args;
     }
 
     private Position getContextPosition(ParserRuleContext ctx) {
