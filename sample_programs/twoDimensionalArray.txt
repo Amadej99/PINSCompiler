@@ -1,0 +1,17 @@
+declare printf(_ : string, ...) : integer;
+
+fun main() : integer = (
+    {for i = 0, 10, 1 : (
+        {x[0][i] = i},
+        printf('Original: %d\n', x[0][i])
+    )},
+    printfArr(x),
+    0
+) { where var x : arr [10] arr[10] integer; var i : integer };
+
+fun printfArr(x : arr [10] arr[10] integer) : integer = (
+    {for i = 0, 10, 1 : (
+        printf('%d\n', x[0][i])
+    )},
+    0
+) { where var i : integer }

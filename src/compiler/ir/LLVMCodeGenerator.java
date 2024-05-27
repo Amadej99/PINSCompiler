@@ -36,6 +36,10 @@ import compiler.parser.ast.type.TypeName;
 import compiler.seman.common.NodeDescription;
 import compiler.seman.type.type.Type;
 
+import static compiler.seman.type.type.Type.resolveArrayAtomType;
+import static compiler.seman.type.type.Type.resolveArrayLLVMAtomType;
+import static compiler.seman.type.type.Type.resolveInnerLLVMArrayType;
+import static compiler.seman.type.type.Type.resolveLLVMArrayType;
 import static compiler.seman.type.type.Type.Array.*;
 
 import java.util.Map;
@@ -207,26 +211,65 @@ public class LLVMCodeGenerator implements Visitor {
             var arrayAtomType = resolveArrayLLVMAtomType(context, types.valueFor(name).get());
             var arrayType = resolveLLVMArrayType(types.valueFor(name).get(), arrayAtomType);
 
-            var indecesAsList = new ArrayList<Pointer>();
-            indecesAsList.add(LLVMConstInt(LLVMInt64TypeInContext(context), 0, 0));
-            resolveArrayIndeces(binary, indecesAsList);
+            var allocatedType = LLVMGetAllocatedType(NamedValues.get(name.name));
+            var innerType = resolveInnerLLVMArrayType(types.valueFor(name).get(), arrayAtomType);
 
-            Pointer[] pointersArray = new Pointer[indecesAsList.size()];
+            var indecesAsList = new ArrayList<Pointer>();
+
+            // Resolve indices for GEP instruction
+            if (isNonGlobalPointer(NamedValues.get(name.name), allocatedType, innerType)) {
+                resolveArrayIndeces(binary, indecesAsList);
+            } else {
+                indecesAsList.add(LLVMConstInt(LLVMInt64TypeInContext(context), 0, 0));
+                resolveArrayIndeces(binary, indecesAsList);
+            }
+
+            // Convert list of indices to array of pointers
+            var pointersArray = new Pointer[indecesAsList.size()];
             indecesAsList.toArray(pointersArray);
 
             var indeces = new PointerPointer<>(pointersArray);
 
-            var gep = LLVMBuildInBoundsGEP2(builder, arrayType, NamedValues.get(name.name), indeces,
-                    indecesAsList.size(), name.name);
+            // Determine if the value should be loaded (non-global pointer case)
+            var value = NamedValues.get(name.name);
+            var alloca = shouldLoadPointer(value, allocatedType)
+                    ? LLVMBuildLoad2(builder, LLVMPointerTypeInContext(context, 0), value, name.name)
+                    : value;
 
-            var loadType = types.valueFor(name).get().dereferenceArray(indecesAsList.size() - 1, context);
+            // Build GEP instruction
+            var gep = LLVMBuildInBoundsGEP2(
+                    builder,
+                    getElementType(value, allocatedType, innerType, arrayType),
+                    alloca,
+                    indeces,
+                    indecesAsList.size(),
+                    name.name);
 
+            // Determine the load type and load the value
+            var amountToDereference = shouldLoadPointer(value, allocatedType) ? indecesAsList.size()
+                    : indecesAsList.size() - 1;
+            var loadType = types.valueFor(name).get().dereferenceArray(amountToDereference, context);
             var load = LLVMBuildLoad2(builder, loadType, gep, name.name);
+
             IRNodes.store(load, binary);
         }
     }
 
-    // TODO: Refactor!
+    private boolean isNonGlobalPointer(LLVMValueRef value, LLVMTypeRef allocatedType, LLVMTypeRef innerType) {
+        return LLVMGetValueKind(value) != LLVMGlobalVariableValueKind &&
+                LLVMGetTypeKind(allocatedType) == LLVMPointerTypeKind &&
+                LLVMGetTypeKind(innerType) != LLVMArrayTypeKind;
+    }
+
+    private boolean shouldLoadPointer(LLVMValueRef value, LLVMTypeRef allocatedType) {
+        return LLVMGetValueKind(value) != LLVMGlobalVariableValueKind &&
+                LLVMGetTypeKind(allocatedType) == LLVMPointerTypeKind;
+    }
+
+    private LLVMTypeRef getElementType(LLVMValueRef value, LLVMTypeRef allocatedType, LLVMTypeRef innerType,
+            LLVMTypeRef arrayType) {
+        return isNonGlobalPointer(value, allocatedType, innerType) ? innerType : arrayType;
+    }
 
     private void resolveArrayIndeces(Binary binary, List<Pointer> indeces) {
         binary.right.accept(this);
@@ -248,7 +291,7 @@ public class LLVMCodeGenerator implements Visitor {
     }
 
     @Override
-    public void visit(For forLoop) {
+        public void visit(For forLoop) {
         forLoop.low.accept(this);
 
         var currentBlock = LLVMGetInsertBlock(builder);
@@ -298,7 +341,7 @@ public class LLVMCodeGenerator implements Visitor {
         if (oldCounterNameValue != null)
             NamedValues.put(forLoop.counter.name, oldCounterNameValue);
 
-        IRNodes.store(IRNodes.valueFor(forLoop.body).get(), forLoop);
+        IRNodes.store(LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0), forLoop);
     }
 
     @Override
@@ -352,20 +395,16 @@ public class LLVMCodeGenerator implements Visitor {
             var phi = LLVMBuildPhi(builder, LLVMInt32TypeInContext(context), "phi");
             var phiValues = new PointerPointer<>(2);
             phiValues.put(0, IRNodes.valueFor(ifThenElse.thenExpression).get());
-            ifThenElse.elseExpression
-                    .ifPresent(
-                            elseExpr -> IRNodes.valueFor(elseExpr).ifPresent(elseValue -> phiValues.put(1, elseValue)));
+            phiValues.put(1, IRNodes.valueFor(ifThenElse.elseExpression.get()).get());
 
             var phiBlocks = new PointerPointer<>(2);
             phiBlocks.put(0, thenBlock);
-            if (ifThenElse.elseExpression.isPresent()) {
-                phiBlocks.put(1, elseBlock);
-            }
+            phiBlocks.put(1, elseBlock);
 
             LLVMAddIncoming(phi, phiValues, phiBlocks, ifThenElse.elseExpression.isPresent() ? 2 : 1);
         }
 
-        IRNodes.store(IRNodes.valueFor(ifThenElse.thenExpression).get(), ifThenElse);
+        IRNodes.store(LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0), ifThenElse);
     }
 
     @Override
@@ -398,7 +437,8 @@ public class LLVMCodeGenerator implements Visitor {
                         LLVMBuildSub(builder, LLVMConstInt(LLVMInt32TypeInContext(context), 0, 1), value, "-Value"),
                         unary);
             } else if (unary.operator.equals(Unary.Operator.NOT)) {
-                IRNodes.store(LLVMBuildNeg(builder, value, "!Value"), unary);
+                IRNodes.store(LLVMBuildICmp(builder, LLVMIntNE, value,
+                        LLVMConstInt(LLVMInt1TypeInContext(context), 0, 0), "!value"), unary);
             }
         });
     }
@@ -420,7 +460,7 @@ public class LLVMCodeGenerator implements Visitor {
 
         LLVMAppendExistingBasicBlock(currentFunction, exit);
         LLVMPositionBuilderAtEnd(builder, exit);
-        IRNodes.store(IRNodes.valueFor(whileLoop.body).get(), whileLoop);
+        IRNodes.store(LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0), whileLoop);
     }
 
     @Override
@@ -463,7 +503,10 @@ public class LLVMCodeGenerator implements Visitor {
             IntStream.range(0, parameters.definitions.size()).forEach(i -> {
                 Parameter parameter = (Parameter) funDef.parameters.get().definitions.get(i);
                 types.valueFor(parameter.type).ifPresent(type -> {
-                    parameterTypes.put(i, type.convertToLLVMType(context));
+                    if (type.isArray())
+                        parameterTypes.put(i, LLVMPointerTypeInContext(context, 0));
+                    else
+                        parameterTypes.put(i, type.convertToLLVMType(context));
                 });
             });
         });
@@ -495,8 +538,14 @@ public class LLVMCodeGenerator implements Visitor {
             funDef.parameters.ifPresent(parameters -> {
                 IntStream.range(0, parameters.definitions.size()).forEach(i -> {
                     var parameter = (Parameter) funDef.parameters.get().definitions.get(i);
-                    var parameterType = types.valueFor(parameter.type).get().convertToLLVMType(context);
-                    var alloca = LLVMBuildAlloca(builder, parameterType, parameter.name);
+                    var parameterType = types.valueFor(parameter.type).get();
+                    var LLVMParameterType = parameterType.convertToLLVMType(context);
+
+                    LLVMValueRef alloca = null;
+                    if (!parameterType.isArray())
+                        alloca = LLVMBuildAlloca(builder, LLVMParameterType, parameter.name);
+                    else
+                        alloca = LLVMBuildAlloca(builder, LLVMPointerTypeInContext(context, 0), parameter.name);
                     LLVMBuildStore(builder, LLVMGetParam(function, i), alloca);
                     NamedValues.put(parameter.name, alloca);
                 });
