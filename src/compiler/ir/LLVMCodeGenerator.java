@@ -40,7 +40,6 @@ import static compiler.seman.type.type.Type.resolveArrayAtomType;
 import static compiler.seman.type.type.Type.resolveArrayLLVMAtomType;
 import static compiler.seman.type.type.Type.resolveInnerLLVMArrayType;
 import static compiler.seman.type.type.Type.resolveLLVMArrayType;
-import static compiler.seman.type.type.Type.Array.*;
 
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -120,9 +119,16 @@ public class LLVMCodeGenerator implements Visitor {
 
         call.arguments.ifPresent(arguments -> {
             IntStream.range(0, call.arguments.get().size()).forEach(i -> {
-                IRNodes.valueFor(arguments.get(i)).ifPresent(value -> {
-                    argumentsPointer.put(i, value);
-                });
+                var argument = arguments.get(i);
+                if (argument instanceof Name name && types.valueFor(name).get().isArray()) {
+                    var value = NamedValues.get(name.name);
+                    var allocatedType = LLVMGetAllocatedType(NamedValues.get(name.name));
+                    var alloca = shouldLoadPointer(value, allocatedType)
+                            ? LLVMBuildLoad2(builder, LLVMPointerTypeInContext(context, 0), value, name.name)
+                            : value;
+                    argumentsPointer.put(i, alloca);
+                } else
+                    argumentsPointer.put(i, IRNodes.valueFor(arguments.get(i)).get());
             });
         });
 
@@ -156,7 +162,13 @@ public class LLVMCodeGenerator implements Visitor {
 
                 var indeces = new PointerPointer<>(pointersArray);
 
-                var gep = LLVMBuildInBoundsGEP2(builder, arrayType, NamedValues.get(name.name), indeces,
+                var value = NamedValues.get(name.name);
+                var allocatedType = LLVMGetAllocatedType(NamedValues.get(name.name));
+                var alloca = shouldLoadPointer(value, allocatedType)
+                        ? LLVMBuildLoad2(builder, LLVMPointerTypeInContext(context, 0), value, name.name)
+                        : value;
+
+                var gep = LLVMBuildInBoundsGEP2(builder, arrayType, alloca, indeces,
                         indecesAsList.size(), name.name);
 
                 LLVMBuildStore(builder, right, gep);
@@ -291,56 +303,69 @@ public class LLVMCodeGenerator implements Visitor {
     }
 
     @Override
-        public void visit(For forLoop) {
+    public void visit(For forLoop) {
+        // Process the initial value of the loop counter
         forLoop.low.accept(this);
 
+        // Get the current block and function
         var currentBlock = LLVMGetInsertBlock(builder);
         var currentFunction = LLVMGetBasicBlockParent(currentBlock);
-        var loop = LLVMAppendBasicBlock(currentFunction, "loop");
 
+        // Create basic blocks for loop body and after loop
+        var loopBlock = LLVMAppendBasicBlock(currentFunction, "loop");
+        var afterBlock = LLVMAppendBasicBlock(currentFunction, "afterLoop");
+
+        // Initialize the counter
         var counterAddress = NamedValues.get(forLoop.counter.name);
         LLVMBuildStore(builder, IRNodes.valueFor(forLoop.low).get(), counterAddress);
+
+        // Jump to the loop block
+        LLVMBuildBr(builder, loopBlock);
+
+        // Start inserting into the loop block
+        LLVMPositionBuilderAtEnd(builder, loopBlock);
+
+        // Load the current value of the counter
         var counterValue = LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), counterAddress,
                 forLoop.counter.name + " value");
 
-        LLVMBuildBr(builder, loop);
-        LLVMPositionBuilderAtEnd(builder, loop);
-        var phi = LLVMBuildPhi(builder, LLVMInt32TypeInContext(context), "loopPhi");
-        var phiValues = new PointerPointer<>(2);
-        phiValues.put(0, counterValue);
-        var phiBlocks = new PointerPointer<>(2);
-        phiBlocks.put(0, currentBlock);
-
+        // Save the original counter value for restoration later
         var oldCounterNameValue = NamedValues.get(forLoop.counter.name);
         NamedValues.remove(forLoop.counter.name);
-        var phiAddress = LLVMBuildAlloca(builder, LLVMInt32TypeInContext(context), "phiAddress");
-        LLVMBuildStore(builder, phi, phiAddress);
-        NamedValues.put(forLoop.counter.name, phiAddress);
+        NamedValues.put(forLoop.counter.name, counterAddress);
 
+        // Visit the body of the loop
         forLoop.body.accept(this);
+
+        // Process the step value
         forLoop.step.accept(this);
 
-        var nextCounterValue = LLVMBuildAdd(builder, phi, IRNodes.valueFor(forLoop.step).get(), "nextValue");
+        // Calculate the next value of the counter
+        var nextCounterValue = LLVMBuildAdd(builder, counterValue, IRNodes.valueFor(forLoop.step).get(), "nextValue");
 
+        // Store the next counter value
+        LLVMBuildStore(builder, nextCounterValue, counterAddress);
+
+        // Process the high value of the loop
         forLoop.high.accept(this);
 
-        var endForBlock = LLVMGetInsertBlock(builder);
-
-        var afterBlock = LLVMAppendBasicBlock(currentFunction, "afterLoop");
+        // Compare the counter with the high value
         var condition = LLVMBuildICmp(builder, LLVMIntULT, nextCounterValue, IRNodes.valueFor(forLoop.high).get(),
                 "counter < high");
-        LLVMBuildCondBr(builder, condition, loop, afterBlock);
+
+        // Create a conditional branch to either loop or afterLoop
+        LLVMBuildCondBr(builder, condition, loopBlock, afterBlock);
+
+        // Set the builder to insert into the afterBlock
         LLVMPositionBuilderAtEnd(builder, afterBlock);
 
-        phiValues.put(1, nextCounterValue);
-        phiBlocks.put(1, endForBlock);
-
-        LLVMAddIncoming(phi, phiValues, phiBlocks, 2);
-
+        // Restore the original counter value if it existed
         NamedValues.remove(forLoop.counter.name);
-        if (oldCounterNameValue != null)
+        if (oldCounterNameValue != null) {
             NamedValues.put(forLoop.counter.name, oldCounterNameValue);
+        }
 
+        // Optionally, store some final value
         IRNodes.store(LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0), forLoop);
     }
 
@@ -437,8 +462,8 @@ public class LLVMCodeGenerator implements Visitor {
                         LLVMBuildSub(builder, LLVMConstInt(LLVMInt32TypeInContext(context), 0, 1), value, "-Value"),
                         unary);
             } else if (unary.operator.equals(Unary.Operator.NOT)) {
-                IRNodes.store(LLVMBuildICmp(builder, LLVMIntNE, value,
-                        LLVMConstInt(LLVMInt1TypeInContext(context), 0, 0), "!value"), unary);
+                IRNodes.store(LLVMBuildICmp(builder, LLVMIntEQ, value,
+                        LLVMConstInt(LLVMInt1TypeInContext(context), 0, 0), "!"), unary);
             }
         });
     }
