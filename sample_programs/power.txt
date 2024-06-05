@@ -1,10 +1,12 @@
+declare printf(_ : string, ...) : integer;
+
 fun power(x : integer, n : integer) : integer = (
     { if ( n == 0 ) then { z = 1 }
     else { z = x * power(x, n - 1)}},
     z) { where var z : integer };
 
-fun main( argc : integer ) : integer = (
+fun main() : integer = (
     { x = 5 }, { n = 3 },
     {x = power(x, n)},
-    x
+    printf('%d\n', x)
 ) { where var n : integer; var x : integer}

@@ -1,4 +1,6 @@
-fun while(x : integer) : integer = (
+declare printf(_ : string, ...) : integer;
+
+fun while1(x : integer) : integer = (
     { i = 0 },
     { while i < 10 : (
         {i = i + 1},
@@ -8,6 +10,6 @@ fun while(x : integer) : integer = (
 
 fun main( argc : integer ) : integer = (
     { x = 5 },
-    {x = while(x)},
-    x
+    {x = while1(x)},
+    printf('%d\n', x)
 ) { where var n : integer; var x : integer}
