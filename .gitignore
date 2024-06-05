@@ -9,3 +9,5 @@ __MACOSX
 *.exe
 *.o
 src/.antlr
+*.ll
+*.c
