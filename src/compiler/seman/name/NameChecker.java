@@ -50,11 +50,7 @@ public class NameChecker implements Visitor {
                 Report.error(call.name + " ni funkcija!");
             definitions.store(value, call);
         }, () -> {
-            // Ce ni definirana, preveri ali je v knjiznici
-            if (Constants.Library.contains(call.name))
-                call.arguments.ifPresent(arguments -> arguments.forEach(argument -> argument.accept(this)));
-            else
-                Report.error(call.name + " ni definirana funkcija!");
+            Report.error("Nedefinirana funkcija " + call.name);
         });
         // Acceptaj argumente
         call.arguments.ifPresent(arguments -> arguments.forEach(argument -> argument.accept(this)));
