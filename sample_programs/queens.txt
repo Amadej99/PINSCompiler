@@ -1,0 +1,36 @@
+declare printf(_ : string, ...) : integer;
+
+fun main() : integer =
+(
+    printf('%d\n', queens(0, 8, board)),
+    0
+) { where var board : arr [8] integer };
+
+fun queens(q : integer, num_queens : integer, board : arr[8] integer) : integer =
+(
+    {
+        if q == num_queens then (
+            { count = 1 }
+        )
+        else (
+            { count = 0 },
+            {
+                for r = 0, 8, 1 : (
+                    { conflict = false },
+                    {
+                        for c = 0, q, 1 : (
+                            { conflict = conflict | r == board[c] | board[c] - r == q - c | board[c] - r == c - q }
+                        )
+                    },
+                    {
+                        if !conflict then (
+                            { board[q] = r },
+                            { count = count + queens(q + 1, num_queens, board) }
+                        )
+                    }
+                )
+            }
+        )
+    },
+    count
+) { where var count : integer; var r : integer; var c : integer; var conflict : logical }

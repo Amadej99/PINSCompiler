@@ -5,11 +5,14 @@ fun main() : integer = (
         {x[0][i] = i},
         printf('Original: %d\n', x[0][i])
     )},
-    printfArr(x),
+    printArr(x),
+    {for i = 0, 10, 1 : (
+        printf('Modified: %d\n', x[0][i])
+    )},
     0
 ) { where var x : arr [10] arr[10] integer; var i : integer };
 
-fun printfArr(x : arr [10] arr[10] integer) : integer = (
+fun printArr(x : arr [10] arr[10] integer) : integer = (
     {for i = 0, 10, 1 : (
         printf('%d\n', x[0][i])
     )},
@@ -17,9 +20,10 @@ fun printfArr(x : arr [10] arr[10] integer) : integer = (
     0
 ) { where var i : integer };
 
-fun printSubArr(x : arr [10] integer) : integer = (
+fun printSubArr(x : arr [10] integer): integer = (
     {for i = 0, 10, 1 : (
-        printf('%d\n' x[i])
+        { x[i] = i + 1 },
+        printf('%d\n', x[i])
     )},
-    0
-)
+    0  
+) { where var i : integer }
