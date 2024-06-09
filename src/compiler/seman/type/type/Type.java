@@ -159,7 +159,10 @@ public abstract class Type {
             else if(currentType.isArray())
                 currentType = currentType.asArray().get().type;
         }
-        return currentType.convertToLLVMType(context);
+        if(currentType.isAtom())
+            return currentType.convertToLLVMType(context);
+        else
+            return LLVMPointerTypeInContext(context, 0);
     }
 
     /**

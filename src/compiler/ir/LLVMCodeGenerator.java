@@ -128,7 +128,7 @@ public class LLVMCodeGenerator implements Visitor {
                             : value;
                     argumentsPointer.put(i, alloca);
                 } else
-                    argumentsPointer.put(i, IRNodes.valueFor(arguments.get(i)).get());
+                    argumentsPointer.put(i, IRNodes.valueFor(argument).get());
             });
         });
 
@@ -220,7 +220,7 @@ public class LLVMCodeGenerator implements Visitor {
             IRNodes.store(LLVMBuildOr(builder, left, right, "or"), binary);
         } else if (binary.operator.equals(Binary.Operator.ARR)) {
             var name = binary.getArrayName();
-            var arrayAtomType = resolveArrayLLVMAtomType(context, types.valueFor(name).get());
+                        var arrayAtomType = resolveArrayLLVMAtomType(context, types.valueFor(name).get());
             var arrayType = resolveLLVMArrayType(types.valueFor(name).get(), arrayAtomType);
 
             var allocatedType = LLVMGetAllocatedType(NamedValues.get(name.name));
@@ -257,13 +257,17 @@ public class LLVMCodeGenerator implements Visitor {
                     indecesAsList.size(),
                     name.name);
 
-            // Determine the load type and load the value
-            var amountToDereference = shouldLoadPointer(value, allocatedType) ? indecesAsList.size()
-                    : indecesAsList.size() - 1;
+            // Poizvedi, če je tip vrednosti, ki je zahtevan, atomaren
+            var amountToDereference = isNonGlobalPointer(NamedValues.get(name.name), allocatedType, innerType) ? indecesAsList.size() : indecesAsList.size() - 1;
             var loadType = types.valueFor(name).get().dereferenceArray(amountToDereference, context);
             var load = LLVMBuildLoad2(builder, loadType, gep, name.name);
 
-            IRNodes.store(load, binary);
+            if(LLVMGetTypeKind(loadType) == LLVMArrayTypeKind || LLVMGetTypeKind(loadType) == LLVMPointerTypeKind){
+                IRNodes.store(gep, binary);
+            }
+            else{
+                IRNodes.store(load, binary);
+            }
         }
     }
 
