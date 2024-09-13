@@ -159,10 +159,24 @@ public abstract class Type {
             else if(currentType.isArray())
                 currentType = currentType.asArray().get().type;
         }
+//      Tukaj zlorabim LLVMInt64Type, da nedvoumno vem, da je vrnjeni tip kazalec na niz, ki ga je treba naložiti.
+        if(currentType.isStr())
+            return LLVMInt64TypeInContext(context);
         if(currentType.isAtom())
             return currentType.convertToLLVMType(context);
         else
             return LLVMPointerTypeInContext(context, 0);
+    }
+
+    public LLVMTypeRef getDereferencedType(int dereferenceCount, LLVMContextRef context){
+        var currentType = this;
+        for (int i = 0; i < dereferenceCount; i++) {
+            if(currentType.isAtom())
+                return currentType.convertToLLVMType(context);
+            else if(currentType.isArray())
+                currentType = currentType.asArray().get().type;
+        }
+        return currentType.convertToLLVMType(context);
     }
 
     /**
@@ -191,13 +205,35 @@ public abstract class Type {
         if (this.isInt())
             return LLVMInt32TypeInContext(context);
         else if (this.isLog())
-            return LLVMInt1TypeInContext(context);
+            return LLVMInt32TypeInContext(context);
         else if (this.isStr())
             return LLVMPointerTypeInContext(context, 0);
         else if (this.isArray())
             return resolveLLVMArrayType(this, resolveArrayLLVMAtomType(context, this));
         else
             return null;
+    }
+
+    /**
+     * Vrne velikost tipa. Če je tip tabela, vrne velikost tabele.
+     * @return
+     */
+    public int getSize(){
+        if(this.isInt())
+            return 4;
+        if(this.isLog())
+            return 4;
+        if(this.isStr())
+            return 8;
+
+        var base = 1;
+        Type currentType = this.asArray().get();
+        while(currentType.isArray()){
+            var asArray = currentType.asArray().get();
+            base *= asArray.size;
+            currentType = asArray.type;
+        }
+        return base * currentType.getSize(); 
     }
 
     // ------------------------------------
