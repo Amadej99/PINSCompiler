@@ -205,7 +205,7 @@ public abstract class Type {
         if (this.isInt())
             return LLVMInt32TypeInContext(context);
         else if (this.isLog())
-            return LLVMInt32TypeInContext(context);
+            return LLVMInt1TypeInContext(context);
         else if (this.isStr())
             return LLVMPointerTypeInContext(context, 0);
         else if (this.isArray())
@@ -220,7 +220,7 @@ public abstract class Type {
      */
     public int getSize(){
         if(this.isInt())
-            return 4;
+            return 1;
         if(this.isLog())
             return 4;
         if(this.isStr())

@@ -378,7 +378,7 @@ public class LLVMCodeGenerator implements Visitor {
                 IRNodes.store(LLVMConstInt(LLVMInt32TypeInContext(context), Integer.parseInt(literal.value), 0),
                         literal);
             else if (type.isLog())
-                IRNodes.store(LLVMConstInt(LLVMInt32TypeInContext(context), literal.value.equals("true") ? 1 : 0, 0),
+                IRNodes.store(LLVMConstInt(LLVMInt1TypeInContext(context), literal.value.equals("true") ? 1 : 0, 0),
                         literal);
             else if (type.isStr()) {
                 var string = LLVMBuildGlobalStringPtr(builder, literal.value.replace("\\n", "\n"), ".string");
@@ -404,7 +404,7 @@ public class LLVMCodeGenerator implements Visitor {
                         unary);
             } else if (unary.operator.equals(Unary.Operator.NOT)) {
                 IRNodes.store(LLVMBuildICmp(builder, LLVMIntEQ, value,
-                        LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0), "!"), unary);
+                        LLVMConstInt(LLVMInt1TypeInContext(context), 0, 0), "!"), unary);
             }
         });
     }
