@@ -10,6 +10,11 @@ import static common.RequireNonNull.requireNonNull;
 import compiler.common.Visitor;
 import compiler.lexer.Position;
 import compiler.parser.ast.def.Defs;
+import compiler.parser.ast.def.FunDef;
+import compiler.parser.ast.def.VarDef;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class Where extends Expr {
     /**
@@ -31,4 +36,12 @@ public class Where extends Expr {
     }
 
 	@Override public void accept(Visitor visitor) { visitor.visit(this); }
+
+    public boolean hasFunctionDefs() {
+        return this.defs.definitions.stream().anyMatch(definition -> definition instanceof FunDef);
+    }
+
+    public List<VarDef> getVarDefs(){
+        return this.defs.definitions.stream().filter(def -> def instanceof VarDef).map(def -> (VarDef) def).toList();
+    }
 }

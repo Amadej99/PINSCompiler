@@ -19,8 +19,10 @@ import org.antlr.v4.runtime.ParserRuleContext;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Stack;
 
 public class pinsAstVisitor extends pinsParserBaseVisitor<Ast> {
+    private Stack<FunDef> funDefStack = new Stack<>();
 
     @Override
     public Ast visitProgram(ProgramContext ctx) {
@@ -69,12 +71,14 @@ public class pinsAstVisitor extends pinsParserBaseVisitor<Ast> {
 
         return new FunDef(getContextPosition(ctx), name,
                 parameters.definitions.isEmpty() ? Optional.empty() : Optional.of(parameters), type, Optional.empty(),
-                isVarArg);
+                isVarArg, Optional.empty());
     }
 
     @Override
     public FunDef visitFunction_definition(Function_definitionContext ctx) {
         var name = ctx.IDENTIFIER().getText();
+        var currentFunction = new FunDef(getContextPosition(ctx), name);
+        funDefStack.push(currentFunction);
         var parameters = this.visitParameters(ctx.parameters());
         var type = this.visitType(ctx.type());
         var expr = this.visitExpression(ctx.expression());
@@ -84,9 +88,12 @@ public class pinsAstVisitor extends pinsParserBaseVisitor<Ast> {
             Report.error(getContextPosition(ctx),
                     "Variabilno število parametrov se lahko uporablja samo pri deklaracijah zunanjih funkcij!");
 
-        return new FunDef(getContextPosition(ctx), name,
-                parameters.definitions.isEmpty() ? Optional.empty() : Optional.of(parameters), type, Optional.of(expr),
-                false);
+        currentFunction.setFunDef(parameters.definitions.isEmpty() ? Optional.empty() : Optional.of(parameters), type, Optional.of(expr),
+                false, funDefStack.size() > 1 ? Optional.of(funDefStack.get(funDefStack.size() - 2)) : Optional.empty());
+
+        funDefStack.pop();
+
+        return currentFunction;
     }
 
     @Override
