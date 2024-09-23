@@ -1,4 +1,25 @@
-var x : integer;
-typ z : integer;
+declare printf(_ : string, ...) : integer;
 
-declare printf( x : integer ) : integer
+fun main () : integer = (
+    { x = 15 },
+    { y = 16 },
+    { z = 10 },
+    { o = 1 },
+#    { c = 15 },
+    printf('Printing x + y + z: %d\n', x + y + z),
+    printInt(35),
+    0
+) { where var x : integer;
+    fun printInt( f : integer ) : integer = (
+        { c = 1 },
+        printf('PrintInt: %d\n', x + y + c + o + f),
+        printInt2(),
+        0
+    ) { where var c : integer;
+        fun printInt2() : integer = (
+        printf('PrintInt2: %d\n', o)
+     )};
+    var o : integer;
+    var y : integer;
+    var z : integer
+}

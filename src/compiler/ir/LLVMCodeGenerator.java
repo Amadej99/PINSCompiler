@@ -1,5 +1,7 @@
 package compiler.ir;
 
+import compiler.seman.name.env.FastSymbolTable;
+import compiler.seman.name.env.SymbolTable;
 import org.bytedeco.llvm.LLVM.LLVMBuilderRef;
 import org.bytedeco.llvm.LLVM.LLVMContextRef;
 import org.bytedeco.llvm.LLVM.LLVMModuleRef;
@@ -72,18 +74,7 @@ public class LLVMCodeGenerator implements Visitor {
      */
     public NodeDescription<LLVMValueRef> IRNodes;
 
-    /**
-     * Kazalci na vrednosti.
-     */
-    public HashMap<String, LLVMValueRef> NamedValues;
-
-    public HashMap<FunDef, List<String>> CapturedValues;
-
-    public HashMap<LLVMValueRef, FunDef> FunctionToFunDef;
-
-    public HashMap<String, FunDef> NamedFunDefs;
-
-    public HashMap<FunDef, LLVMValueRef> ClosureStructs;
+    public SymbolTable symbolTable;
 
     /**
      * Tipi funkcij.
@@ -102,35 +93,32 @@ public class LLVMCodeGenerator implements Visitor {
         this.builder = builder;
         this.types = types;
         this.IRNodes = new NodeDescription<LLVMValueRef>();
-        this.NamedValues = new HashMap<String, LLVMValueRef>();
         this.functionTypes = new HashMap<>();
-        this.NamedFunDefs = new HashMap<>();
-        this.ClosureStructs = new HashMap<>();
-        this.CapturedValues = new HashMap<>();
-        this.FunctionToFunDef = new HashMap<>();
+        this.symbolTable = new FastSymbolTable();
     }
 
     @Override
     public void visit(Call call) {
         var calledFunction = LLVMGetNamedFunction(module, call.name);
-        var calledFunDef = NamedFunDefs.get(call.name);
+        var triple = symbolTable.definitionFor(call.name);
+        var calledFunDef = triple.get().getDef().asFunDef().get();
 
         call.arguments.ifPresent(arguments -> arguments.forEach(argument -> argument.accept(this)));
 
-        var argumentsList = new ArrayList<>();
-
-        calledFunDef.parentFunction.ifPresent(parentFunDef -> {
-            argumentsList.add(ClosureStructs.get(parentFunDef));
-        });
+        var argumentsList = new ArrayList<LLVMValueRef>();
 
         call.arguments.ifPresent(arguments -> {
             arguments.stream().forEachOrdered(argument -> {
                 if (argument instanceof Name name && types.valueFor(name).get().isArray()) {
-                    argumentsList.add(NamedValues.get(name.name));
+                    argumentsList.add(symbolTable.definitionFor(name.name).get().getValueRef().get());
                 } else {
                     argumentsList.add(IRNodes.valueFor(argument).get());
                 }
             });
+        });
+
+        calledFunDef.parentFunction.ifPresent(parentFunDef -> {
+            argumentsList.add(parentFunDef.closureInstance.get());
         });
 
         IRNodes.store(LLVMBuildCall2(builder, functionTypes.get(call.name), calledFunction, new PointerPointer(argumentsList.toArray(new Pointer[0])),
@@ -144,7 +132,7 @@ public class LLVMCodeGenerator implements Visitor {
             var right = IRNodes.valueFor(binary.right).get();
 
             if (binary.left instanceof Name name) {
-                var address = NamedValues.get(name.name);
+                var address = name.getValueAddress(builder, symbolTable);
                 var type = types.valueFor(name).get();
 
                 if (type.isArray()) {
@@ -257,7 +245,7 @@ public class LLVMCodeGenerator implements Visitor {
         var afterBlock = LLVMAppendBasicBlock(currentFunction, "afterLoop");
 
         // Initialize the counter
-        var counterAddress = NamedValues.get(forLoop.counter.name);
+        var counterAddress = symbolTable.definitionFor(forLoop.counter.name).get().getValueRef().get();
         LLVMBuildStore(builder, IRNodes.valueFor(forLoop.low).get(), counterAddress);
 
         // Jump to the loop block
@@ -269,11 +257,6 @@ public class LLVMCodeGenerator implements Visitor {
         // Load the current value of the counter
         var counterValue = LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), counterAddress,
                 forLoop.counter.name + " value");
-
-        // Save the original counter value for restoration later
-        var oldCounterNameValue = NamedValues.get(forLoop.counter.name);
-        NamedValues.remove(forLoop.counter.name);
-        NamedValues.put(forLoop.counter.name, counterAddress);
 
         // Visit the body of the loop
         forLoop.body.accept(this);
@@ -300,45 +283,19 @@ public class LLVMCodeGenerator implements Visitor {
         // Set the builder to insert into the afterBlock
         LLVMPositionBuilderAtEnd(builder, afterBlock);
 
-        // Restore the original counter value if it existed
-        NamedValues.remove(forLoop.counter.name);
-        if (oldCounterNameValue != null) {
-            NamedValues.put(forLoop.counter.name, oldCounterNameValue);
-        }
-
         // Optionally, store some final value
         IRNodes.store(LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0), forLoop);
     }
 
     @Override
     public void visit(Name name) {
-        LLVMValueRef alloca = null;
+        var alloca = name.getValueAddress(builder, symbolTable);
 
-        if(NamedValues.containsKey(name.name))
-            alloca = NamedValues.get(name.name);
-
-        var currentBlock = LLVMGetInsertBlock(builder);
-        var currentFunction = LLVMGetBasicBlockParent(currentBlock);
-        var currentFunDef = FunctionToFunDef.get(currentFunction);
-        if (currentFunDef.parentFunction.isPresent()) {
-            var parentFunDef = currentFunDef.parentFunction.get();
-            var closureInstance = LLVMGetParam(currentFunction, 0);
-            if (closureInstance != null) {
-                var varsList = CapturedValues.get(parentFunDef);
-                var index = varsList.indexOf(name.name);
-                if(index != -1) {
-                    var fieldPtr = LLVMBuildStructGEP2(builder, parentFunDef.closureType.get(), closureInstance, index, parentFunDef.name + " closure_field_" + index);
-                    alloca = LLVMBuildLoad2(builder, LLVMPointerType(LLVMInt32Type(), 0), fieldPtr, name.name + "_ptr");
-                }
-            }
-        }
-
-        LLVMValueRef finalAlloca = alloca;
         types.valueFor(name).ifPresent(type -> {
             if (type.isArray()) {
-                IRNodes.store(finalAlloca, name);
+                IRNodes.store(alloca, name);
             } else {
-                IRNodes.store(LLVMBuildLoad2(builder, type.convertToLLVMType(context), finalAlloca, name.name), name);
+                IRNodes.store(LLVMBuildLoad2(builder, type.convertToLLVMType(context), alloca, name.name), name);
             }
         });
     }
@@ -457,32 +414,28 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(Where where) {
-        where.defs.definitions.stream().filter(def -> !(def instanceof VarDef)).toList().forEach(varDef -> varDef.accept(this));
+        where.defs.definitions.stream().filter(def -> !(def instanceof VarDef)).toList().forEach(def -> def.accept(this));
         where.expr.accept(this);
+        symbolTable.popScope();
         var whereReturn = IRNodes.valueFor(where.expr).get();
         IRNodes.store(whereReturn, where);
     }
 
     @Override
     public void visit(Defs defs) {
-        var currentBlock = LLVMGetInsertBlock(builder);
-
         // Globalne spremenljivke je treba alocirati najprej, ne glede na to kje v kodi
         // se nahajajo.
         // Potrebno jih je alocirati le enkrat, na začetku.
-        if (currentBlock == null) {
-            defs.definitions.forEach(def -> {
-                if (def instanceof VarDef)
-                    def.accept(this);
-                if (def instanceof FunDef funDef)
-                    declareFunction(funDef);
-            });
-            defs.definitions.forEach(def -> {
-                if (!(def instanceof VarDef))
-                    def.accept(this);
-            });
-        } else
-            defs.definitions.forEach(def -> def.accept(this));
+        defs.definitions.forEach(def -> {
+            if (def instanceof VarDef)
+                def.accept(this);
+            if (def instanceof FunDef funDef)
+                declareFunction(funDef);
+        });
+        defs.definitions.forEach(def -> {
+            if (!(def instanceof VarDef))
+                def.accept(this);
+        });
     }
 
     private void declareFunction(FunDef funDef) {
@@ -500,7 +453,7 @@ public class LLVMCodeGenerator implements Visitor {
             });
         });
 
-        funDef.parentFunction.ifPresent(def -> parameterTypes.addFirst(LLVMPointerTypeInContext(context, 0)));
+        funDef.parentFunction.ifPresent(def -> parameterTypes.addLast(LLVMPointerTypeInContext(context, 0)));
 
         var returnType = types.valueFor(funDef.type).get();
         LLVMTypeRef LLVMReturnType = null;
@@ -518,7 +471,6 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(FunDef funDef) {
-        NamedFunDefs.put(funDef.name, funDef);
         var function = LLVMGetNamedFunction(module, funDef.name);
 
         if (function == null) {
@@ -526,22 +478,19 @@ public class LLVMCodeGenerator implements Visitor {
             function = LLVMGetNamedFunction(module, funDef.name);
         }
 
-        FunctionToFunDef.put(function, funDef);
-
-        var closureStruct = funDef.generateClosureStruct(context, types);
+        var closureStruct = funDef.generateClosureStruct(context);
 
         var oldBuildingBlock = LLVMGetInsertBlock(builder);
+
+        funDef.addToSymbolTable(symbolTable, Optional.of(function));
+
+        symbolTable.pushScope();
+        System.out.println("Scope pushed to: " + symbolTable.getCurrentScope() + " " + funDef.name);
 
         var finalFunction = function;
         funDef.body.ifPresent(body -> {
             var entry = LLVMAppendBasicBlockInContext(context, finalFunction, "entry");
             LLVMPositionBuilderAtEnd(builder, entry);
-
-            var oldNameValues = NamedValues.entrySet().stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
-
-            var oldCapturedValues = CapturedValues.entrySet().stream()
-                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 
             funDef.parameters.ifPresent(parameters -> {
                 IntStream.range(0, parameters.definitions.size()).forEach(i -> {
@@ -552,13 +501,15 @@ public class LLVMCodeGenerator implements Visitor {
                     if (!parameterType.isArray()) {
                         var alloca = LLVMBuildAlloca(builder, LLVMParameterType, parameter.name);
                         LLVMBuildStore(builder, LLVMGetParam(finalFunction, i), alloca);
-                        NamedValues.put(parameter.name, alloca);
+                        parameter.addToSymbolTable(symbolTable, Optional.of(alloca));
                     } else
-                        NamedValues.put(parameter.name, LLVMGetParam(finalFunction, i));
+                        parameter.addToSymbolTable(symbolTable, Optional.of(LLVMGetParam(finalFunction, i)));
                 });
             });
 
             funDef.getWhere().ifPresent(where -> {
+                symbolTable.pushScope();
+                System.out.println("Scope pushed to: " + symbolTable.getCurrentScope() + " " + funDef.name + " WHERE");
                 where.getVarDefs().stream().forEachOrdered(varDef -> varDef.accept(this));
             });
 
@@ -566,23 +517,20 @@ public class LLVMCodeGenerator implements Visitor {
 
             closureStruct.ifPresent(struct -> {
                 var closureInstance = LLVMBuildAlloca(builder, struct, funDef.name + "_closure");
-                var capturedVariables = funDef.collectVariableValues(NamedValues);
+                funDef.closureInstance = Optional.of(closureInstance);
+                var capturedVariables = funDef.collectVariableValues(symbolTable);
                 var variableNames = capturedVariables.keySet().stream().toList();
+
                 IntStream.range(0, capturedVariables.size()).forEach(i -> {
                     LLVMValueRef ptr = LLVMBuildStructGEP2(builder, struct, closureInstance, i, funDef.name + " closure_field_" + i);
                     LLVMBuildStore(builder, capturedVariables.get(variableNames.get(i)), ptr);
                     capturedVars.add(i, variableNames.get(i));
                 });
-                ClosureStructs.put(funDef, closureInstance);
             });
 
-            CapturedValues.put(funDef, capturedVars);
+            funDef.capturedVariables = capturedVars;
 
             body.accept(this);
-
-            NamedValues = (HashMap<String, LLVMValueRef>) oldNameValues;
-
-            CapturedValues = (HashMap<FunDef, List<String>>) oldCapturedValues;
 
             var returnedValue = IRNodes.valueFor(body).get();
             LLVMBuildRet(builder, returnedValue);
@@ -593,6 +541,9 @@ public class LLVMCodeGenerator implements Visitor {
             if(funDef.parentFunction.isPresent())
                 LLVMPositionBuilderAtEnd(builder, oldBuildingBlock);
         });
+
+        symbolTable.popScope();
+        System.out.println("Scope popped to: " + symbolTable.getCurrentScope() + " " + funDef.name);
     }
 
     @Override
@@ -638,7 +589,7 @@ public class LLVMCodeGenerator implements Visitor {
                     alloca = LLVMBuildAlloca(builder, llvmType, varDef.name);
 
             }
-            NamedValues.put(varDef.name, alloca);
+            varDef.addToSymbolTable(symbolTable, Optional.of(alloca));
         });
     }
 
@@ -670,7 +621,7 @@ public class LLVMCodeGenerator implements Visitor {
 
     private LLVMValueRef buildGEPForArrayElement(Name name, LLVMTypeRef arrayType, Binary left) {
         var indices = buildArrayIndices(left);
-        var basePointer = NamedValues.get(name.name);
+        var basePointer = name.getValueAddress(builder, symbolTable);
 
         var gep = LLVMBuildInBoundsGEP2(builder, arrayType, basePointer, indices,
                 (int) indices.limit(), name.name);

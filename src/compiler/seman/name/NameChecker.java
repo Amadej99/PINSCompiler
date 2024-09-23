@@ -18,6 +18,8 @@ import compiler.seman.common.NodeDescription;
 import compiler.seman.name.env.SymbolTable;
 import compiler.seman.name.env.SymbolTable.DefinitionAlreadyExistsException;
 
+import java.util.Optional;
+
 public class NameChecker implements Visitor {
     /**
      * Opis vozlišč, ki jih povežemo z njihovimi
@@ -44,7 +46,8 @@ public class NameChecker implements Visitor {
     @Override
     public void visit(Call call) {
         // Preveri ali je funkcija definirana
-        symbolTable.definitionFor(call.name).ifPresentOrElse(value -> {
+        symbolTable.definitionFor(call.name).ifPresentOrElse(pair -> {
+            var value = pair.getDef();
             // Ce je definirana, preveri ali je funkcija
             if (!(value instanceof FunDef))
                 Report.error(call.name + " ni funkcija!");
@@ -79,7 +82,8 @@ public class NameChecker implements Visitor {
     @Override
     public void visit(Name name) {
         // Preveri ali je ime definirano
-        symbolTable.definitionFor(name.name).ifPresentOrElse(value -> {
+        symbolTable.definitionFor(name.name).ifPresentOrElse(pair -> {
+            var value = pair.getDef();
             // Ce je definirano, preveri ali je spremenljivka
             if (value instanceof FunDef)
                 Report.error(name.position + " " + name.name + " je funkcija, ne spremenljivka!");
@@ -124,7 +128,7 @@ public class NameChecker implements Visitor {
     public void visit(Defs defs) {
         defs.definitions.forEach(def -> {
             try {
-                symbolTable.insert(def);
+                symbolTable.insert(def, Optional.empty());
             } catch (DefinitionAlreadyExistsException e) {
                 // Ce definicija ze obstaja v simbolni tabeli, javi napako
                 Report.error("Definition already exists! " + def.name + def.position);
@@ -174,7 +178,7 @@ public class NameChecker implements Visitor {
     public void visit(FunDef.Parameters.Parameter parameter) {
         // Preveri ali je parameter ze definiran
         try {
-            symbolTable.insert(parameter);
+            symbolTable.insert(parameter, Optional.empty());
         } catch (DefinitionAlreadyExistsException e) {
             Report.error("Error in NameChecker.visit(Parameter parameter)");
         }
@@ -192,7 +196,8 @@ public class NameChecker implements Visitor {
     @Override
     public void visit(TypeName name) {
         // Preveri ali je tip definiran
-        symbolTable.definitionFor(name.identifier).ifPresentOrElse(value -> {
+        symbolTable.definitionFor(name.identifier).ifPresentOrElse(pair -> {
+            var value = pair.getDef();
             // Ce je definiran, preveri ali je tip
             if (value instanceof VarDef) {
                 Report.error(name.position + " " + name.identifier + " je spremenljvka, ne tip!");
