@@ -132,7 +132,7 @@ public class LLVMCodeGenerator implements Visitor {
             var right = IRNodes.valueFor(binary.right).get();
 
             if (binary.left instanceof Name name) {
-                var address = name.getValueAddress(builder, symbolTable);
+                var address = name.getValueAddress(builder, context, symbolTable);
                 var type = types.valueFor(name).get();
 
                 if (type.isArray()) {
@@ -289,7 +289,7 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(Name name) {
-        var alloca = name.getValueAddress(builder, symbolTable);
+        var alloca = name.getValueAddress(builder, context, symbolTable);
 
         types.valueFor(name).ifPresent(type -> {
             if (type.isArray()) {
@@ -416,7 +416,6 @@ public class LLVMCodeGenerator implements Visitor {
     public void visit(Where where) {
         where.defs.definitions.stream().filter(def -> !(def instanceof VarDef)).toList().forEach(def -> def.accept(this));
         where.expr.accept(this);
-        symbolTable.popScope();
         var whereReturn = IRNodes.valueFor(where.expr).get();
         IRNodes.store(whereReturn, where);
     }
@@ -508,8 +507,6 @@ public class LLVMCodeGenerator implements Visitor {
             });
 
             funDef.getWhere().ifPresent(where -> {
-                symbolTable.pushScope();
-                System.out.println("Scope pushed to: " + symbolTable.getCurrentScope() + " " + funDef.name + " WHERE");
                 where.getVarDefs().stream().forEachOrdered(varDef -> varDef.accept(this));
             });
 
@@ -621,7 +618,7 @@ public class LLVMCodeGenerator implements Visitor {
 
     private LLVMValueRef buildGEPForArrayElement(Name name, LLVMTypeRef arrayType, Binary left) {
         var indices = buildArrayIndices(left);
-        var basePointer = name.getValueAddress(builder, symbolTable);
+        var basePointer = name.getValueAddress(builder, context, symbolTable);
 
         var gep = LLVMBuildInBoundsGEP2(builder, arrayType, basePointer, indices,
                 (int) indices.limit(), name.name);

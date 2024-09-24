@@ -10,10 +10,7 @@ import static common.RequireNonNull.requireNonNull;
 import compiler.common.Visitor;
 import compiler.lexer.Position;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import compiler.parser.ast.type.Type;
 import compiler.parser.ast.expr.Expr;
@@ -144,8 +141,8 @@ public class FunDef extends Def {
         return variables;
     }
 
-    public HashMap<String, LLVMValueRef> collectVariableValues(SymbolTable symbolTable){
-        var variables = new HashMap<String, LLVMValueRef>();
+    public LinkedHashMap<String, LLVMValueRef> collectVariableValues(SymbolTable symbolTable){
+        var variables = new LinkedHashMap<String, LLVMValueRef>();
 
         this.parameters.ifPresent(parameters -> parameters.definitions.stream().forEachOrdered(def -> {
             variables.put(def.name, symbolTable.definitionFor(def.name).get().getValueRef().get());
