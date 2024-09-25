@@ -74,12 +74,10 @@ public class LLVMCodeGenerator implements Visitor {
      */
     public NodeDescription<LLVMValueRef> IRNodes;
 
-    public SymbolTable symbolTable;
-
     /**
-     * Tipi funkcij.
+     * Simbolna tabela, ki vsebuje definicije in naslove spremenljivk.
      */
-    public HashMap<String, LLVMTypeRef> functionTypes;
+    public SymbolTable symbolTable;
 
     /**
      * @param context
@@ -93,7 +91,6 @@ public class LLVMCodeGenerator implements Visitor {
         this.builder = builder;
         this.types = types;
         this.IRNodes = new NodeDescription<LLVMValueRef>();
-        this.functionTypes = new HashMap<>();
         this.symbolTable = new FastSymbolTable();
     }
 
@@ -121,7 +118,7 @@ public class LLVMCodeGenerator implements Visitor {
             argumentsList.add(parentFunDef.closureInstance.get());
         });
 
-        IRNodes.store(LLVMBuildCall2(builder, functionTypes.get(call.name), calledFunction, new PointerPointer(argumentsList.toArray(new Pointer[0])),
+        IRNodes.store(LLVMBuildCall2(builder, calledFunDef.LLVMType, calledFunction, new PointerPointer(argumentsList.toArray(new Pointer[0])),
                 argumentsList.size(), call.name), call);
     }
 
@@ -464,7 +461,7 @@ public class LLVMCodeGenerator implements Visitor {
         var functionType = LLVMFunctionType(LLVMReturnType, new PointerPointer(parameterTypes.toArray(new Pointer[0])), parameterTypes.size(),
                 funDef.isVarArg ? 1 : 0);
 
-        functionTypes.put(funDef.name, functionType);
+        funDef.LLVMType = functionType;
         LLVMAddFunction(module, funDef.name, functionType);
     }
 

@@ -51,6 +51,8 @@ public class FunDef extends Def {
 
     public Optional<Integer> closureSize;
 
+    public LLVMTypeRef LLVMType;
+
     public ArrayList<String> capturedVariables;
 
     /**
