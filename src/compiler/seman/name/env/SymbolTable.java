@@ -9,6 +9,7 @@ import java.util.Optional;
 
 import common.VoidOperator;
 import compiler.parser.ast.def.Def;
+import org.bytedeco.llvm.LLVM.LLVMValueRef;
 
 public interface SymbolTable {
 
@@ -20,7 +21,7 @@ public interface SymbolTable {
      * 
      * @param definition definicija
      */
-    void insert(Def definition) throws DefinitionAlreadyExistsException;
+    void insert(Def definition, Optional<LLVMValueRef> valueRef) throws DefinitionAlreadyExistsException;
 
     /**
      * Vrni definicijo za ime ali `Optional.empty()`,
@@ -28,7 +29,15 @@ public interface SymbolTable {
      * 
      * @param name ime definicije
      */
-    Optional<Def> definitionFor(String name);
+    Optional<Triplet> definitionFor(String name);
+
+    /**
+     * Vrni definicijo za LLVMValueRef ali `Optional.empty()`,
+     * če definicija s podanim LLVMValueRef ne obstaja.
+     *
+     * @param valueRef LLVMValueRef definicije
+     */
+    Optional<Triplet> definitionFor(LLVMValueRef valueRef);
 
     /**
      * Povečaj nivo gnezdenja.
@@ -48,6 +57,8 @@ public interface SymbolTable {
         op.apply();
         popScope();
     }
+
+    void popScopeNonDestructive();
 
     /**
      * Napaka v primeru vstavljanja že obstoječe definicije.

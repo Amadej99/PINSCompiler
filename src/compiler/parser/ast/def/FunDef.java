@@ -10,15 +10,12 @@ import static common.RequireNonNull.requireNonNull;
 import compiler.common.Visitor;
 import compiler.lexer.Position;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
 import compiler.parser.ast.type.Type;
 import compiler.parser.ast.expr.Expr;
 import compiler.parser.ast.expr.Where;
-import compiler.seman.common.NodeDescription;
+import compiler.seman.name.env.SymbolTable;
 import org.bytedeco.javacpp.Pointer;
 import org.bytedeco.javacpp.PointerPointer;
 import org.bytedeco.llvm.LLVM.LLVMContextRef;
@@ -50,7 +47,13 @@ public class FunDef extends Def {
 
     public Optional<LLVMTypeRef> closureType;
 
-    public ArrayList<LLVMTypeRef> collectedVariables;
+    public Optional<LLVMValueRef> closureInstance;
+
+    public Optional<Integer> closureSize;
+
+    public LLVMTypeRef LLVMType;
+
+    public ArrayList<String> capturedVariables;
 
     /**
      * Je funkcija z variabilnim številom parametrov.
@@ -107,14 +110,13 @@ public class FunDef extends Def {
     /**
      * Vse parametre in lokalne spremenljivke shrani v obliki strukta in ga nastavi vozlišču.
      * @param context LLVMContextRef
-     * @param types NodeDescription types
      * @return Optional.of(LLVMTypeRef closure)
      */
-    public Optional<LLVMTypeRef> generateClosureStruct(LLVMContextRef context, NodeDescription<compiler.seman.type.type.Type> types){
+    public Optional<LLVMTypeRef> generateClosureStruct(LLVMContextRef context){
         if(!hasNestedFunctions())
             return Optional.empty();
 
-        var variables = collectVariableTypes(context, types);
+        var variables = collectVariableTypes(context);
         var closureStruct = LLVMStructCreateNamed(context, "closure_" + this.name);
         LLVMStructSetBody(closureStruct, new PointerPointer<>(variables.toArray(new Pointer[0])), variables.size(), 0);
         this.closureType = Optional.of(closureStruct);
@@ -122,42 +124,47 @@ public class FunDef extends Def {
     }
 
 
-    public ArrayList<LLVMTypeRef> collectVariableTypes(LLVMContextRef context, NodeDescription<compiler.seman.type.type.Type> types){
+    public ArrayList<LLVMTypeRef> collectVariableTypes(LLVMContextRef context){
         var variables = new ArrayList<LLVMTypeRef>();
 
         this.parameters.ifPresent(parameters -> parameters.definitions.stream().forEachOrdered(def -> {
-            var asParameter = def.asParameter().get();
-            var type = types.valueFor(asParameter.type).get();
             variables.add(LLVMPointerTypeInContext(context, 0));
         }));
 
         this.body.get().asWhere().ifPresent(where ->{
             where.defs.definitions.stream().forEachOrdered(def -> {
-                if(def instanceof VarDef varDef)
+                if(def instanceof VarDef)
                     variables.add(LLVMPointerTypeInContext(context, 0));
             });
         });
 
+        this.parentFunction.ifPresent(parentFun -> variables.addLast(LLVMPointerTypeInContext(context, 0)));
+
         return variables;
     }
 
-    public HashMap<String, LLVMValueRef> collectVariableValues(HashMap<String, LLVMValueRef> NamedValues){
-        var variables = new HashMap<String, LLVMValueRef>();
+    public LinkedHashMap<String, LLVMValueRef> collectVariableValues(SymbolTable symbolTable){
+        var variables = new LinkedHashMap<String, LLVMValueRef>();
 
         this.parameters.ifPresent(parameters -> parameters.definitions.stream().forEachOrdered(def -> {
-            variables.put(def.name, NamedValues.get(def.name));
+            variables.put(def.name, symbolTable.definitionFor(def.name).get().getValueRef().get());
         }));
 
         this.body.get().asWhere().ifPresent(where ->{
             where.defs.definitions.stream().forEachOrdered(def -> {
                 if(def instanceof VarDef varDef)
-                    variables.put(varDef.name, NamedValues.get(varDef.name));
+                    variables.put(varDef.name, symbolTable.definitionFor(def.name).get().getValueRef().get());
             });
         });
 
+        this.parentFunction.ifPresent(parentFun -> {
+            variables.put(this.name + "_closure", LLVMGetLastParam(symbolTable.definitionFor(this.name).get().getValueRef().get()));
+        });
+
+        this.closureSize = Optional.of(variables.size());
+
         return variables;
     }
-
 
     public static class Parameters extends Defs {
         public Parameters(Position position, List<Def> parameters){
