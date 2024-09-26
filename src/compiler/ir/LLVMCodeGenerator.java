@@ -94,6 +94,10 @@ public class LLVMCodeGenerator implements Visitor {
         this.symbolTable = new FastSymbolTable();
     }
 
+    /**
+     * Nalozi argumente ter poklice funkcijo.
+     * @param call
+     */
     @Override
     public void visit(Call call) {
         var calledFunction = LLVMGetNamedFunction(module, call.name);
@@ -122,6 +126,10 @@ public class LLVMCodeGenerator implements Visitor {
                 argumentsList.size(), call.name), call);
     }
 
+    /**
+     *
+     * @param binary
+     */
     @Override
     public void visit(Binary binary) {
         if (binary.operator.equals(Binary.Operator.ASSIGN)) {
@@ -230,57 +238,34 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(For forLoop) {
-        // Process the initial value of the loop counter
         forLoop.low.accept(this);
-
-        // Get the current block and function
         var currentBlock = LLVMGetInsertBlock(builder);
         var currentFunction = LLVMGetBasicBlockParent(currentBlock);
 
-        // Create basic blocks for loop body and after loop
         var loopBlock = LLVMAppendBasicBlock(currentFunction, "loop");
         var afterBlock = LLVMAppendBasicBlock(currentFunction, "afterLoop");
 
-        // Initialize the counter
         var counterAddress = symbolTable.definitionFor(forLoop.counter.name).get().getValueRef().get();
         LLVMBuildStore(builder, IRNodes.valueFor(forLoop.low).get(), counterAddress);
-
-        // Jump to the loop block
         LLVMBuildBr(builder, loopBlock);
-
-        // Start inserting into the loop block
         LLVMPositionBuilderAtEnd(builder, loopBlock);
 
-        // Load the current value of the counter
         var counterValue = LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), counterAddress,
                 forLoop.counter.name + " value");
 
-        // Visit the body of the loop
         forLoop.body.accept(this);
 
-        // Process the step value
         forLoop.step.accept(this);
-
-        // Calculate the next value of the counter
         var nextCounterValue = LLVMBuildAdd(builder, counterValue, IRNodes.valueFor(forLoop.step).get(), "nextValue");
-
-        // Store the next counter value
         LLVMBuildStore(builder, nextCounterValue, counterAddress);
 
-        // Process the high value of the loop
         forLoop.high.accept(this);
 
-        // Compare the counter with the high value
         var condition = LLVMBuildICmp(builder, LLVMIntULT, nextCounterValue, IRNodes.valueFor(forLoop.high).get(),
                 "counter < high");
 
-        // Create a conditional branch to either loop or afterLoop
         LLVMBuildCondBr(builder, condition, loopBlock, afterBlock);
-
-        // Set the builder to insert into the afterBlock
         LLVMPositionBuilderAtEnd(builder, afterBlock);
-
-        // Optionally, store some final value
         IRNodes.store(LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0), forLoop);
     }
 
@@ -462,7 +447,8 @@ public class LLVMCodeGenerator implements Visitor {
                 funDef.isVarArg ? 1 : 0);
 
         funDef.LLVMType = functionType;
-        LLVMAddFunction(module, funDef.name, functionType);
+        var function = LLVMAddFunction(module, funDef.name, functionType);
+        funDef.addToSymbolTable(symbolTable, Optional.of(function));
     }
 
     @Override
@@ -475,13 +461,9 @@ public class LLVMCodeGenerator implements Visitor {
         }
 
         var closureStruct = funDef.generateClosureStruct(context);
-
         var oldBuildingBlock = LLVMGetInsertBlock(builder);
 
-        funDef.addToSymbolTable(symbolTable, Optional.of(function));
-
         symbolTable.pushScope();
-        System.out.println("Scope pushed to: " + symbolTable.getCurrentScope() + " " + funDef.name);
 
         var finalFunction = function;
         funDef.body.ifPresent(body -> {
@@ -537,7 +519,6 @@ public class LLVMCodeGenerator implements Visitor {
         });
 
         symbolTable.popScope();
-        System.out.println("Scope popped to: " + symbolTable.getCurrentScope() + " " + funDef.name);
     }
 
     @Override
