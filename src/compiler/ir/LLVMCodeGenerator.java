@@ -113,7 +113,13 @@ public class LLVMCodeGenerator implements Visitor {
                 if (argument instanceof Name name && types.valueFor(name).get().isArray()) {
                     argumentsList.add(symbolTable.definitionFor(name.name).get().getValueRef().get());
                 } else {
-                    argumentsList.add(IRNodes.valueFor(argument).get());
+                    var value = IRNodes.valueFor(argument).get();
+                    // C standard pravi, da se ob klicu funkcije, ki ima variabilno stevilo parametrov,
+                    // vsi argumenti manjsi od int pretvorijo v int.
+                    if(calledFunDef.isVarArg && LLVMGetTypeKind(LLVMTypeOf(value)) == LLVMIntegerTypeKind)
+                        argumentsList.add(LLVMBuildZExt(builder, value, LLVMInt32TypeInContext(context), "zext"));
+                    else
+                        argumentsList.add(IRNodes.valueFor(argument).get());
                 }
             });
         });
