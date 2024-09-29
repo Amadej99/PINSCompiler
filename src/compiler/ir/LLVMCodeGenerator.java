@@ -147,6 +147,7 @@ public class LLVMCodeGenerator implements Visitor {
                 }
 
                 IRNodes.store(right, binary);
+                return;
             } else if (binary.left instanceof Binary left) {
                 var name = left.getArrayName();
                 var type = types.valueFor(name).get();
@@ -162,6 +163,7 @@ public class LLVMCodeGenerator implements Visitor {
                 }
 
                 IRNodes.store(right, binary);
+                return;
             } else {
                 Report.error("Leva stran operacije prirejanja mora biti spremenljivka!");
             }
@@ -614,7 +616,8 @@ public class LLVMCodeGenerator implements Visitor {
     }
 
     private void resolveArrayIndeces(Binary binary, List<Pointer> indices) {
-        binary.right.accept(this);
+        if(IRNodes.valueFor(binary.right).isEmpty())
+            binary.right.accept(this);
         var currentIndex = IRNodes.valueFor(binary.right).get();
 
         if (!(binary.left instanceof Name)) {
