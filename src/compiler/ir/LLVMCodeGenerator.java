@@ -196,9 +196,9 @@ public class LLVMCodeGenerator implements Visitor {
         } else if (binary.operator.equals(Binary.Operator.MUL)) {
             IRNodes.store(LLVMBuildMul(builder, left, right, "mul"), binary);
         } else if (binary.operator.equals(Binary.Operator.DIV)) {
-            IRNodes.store(LLVMBuildUDiv(builder, left, right, "div"), binary);
+            IRNodes.store(LLVMBuildSDiv(builder, left, right, "div"), binary);
         } else if (binary.operator.equals(Binary.Operator.MOD)) {
-            IRNodes.store(LLVMBuildURem(builder, left, right, "mod"), binary);
+            IRNodes.store(LLVMBuildSRem(builder, left, right, "mod"), binary);
         } else if (binary.operator.equals(Binary.Operator.EQ)) {
             IRNodes.store(LLVMBuildICmp(builder, LLVMIntEQ, left, right, "eq"), binary);
         } else if (binary.operator.equals(Binary.Operator.NEQ)) {
