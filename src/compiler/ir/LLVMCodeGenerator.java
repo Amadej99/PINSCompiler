@@ -549,7 +549,7 @@ public class LLVMCodeGenerator implements Visitor {
                     var LLVMArrayType = resolveInnerLLVMArrayType(type, arrayLLVMAtomType);
                     var arrayAtomType = resolveArrayAtomType(type);
                     alloca = LLVMAddGlobal(module, outerLLVMArrayType, varDef.name);
-                    var zeroes = new PointerPointer<>(1);
+                    var zeroes = new PointerPointer<>(arraySize);
                     for (int i = 0; i < arraySize; i++) {
                         if (arrayAtomType.isInt() || arrayAtomType.isLog())
                             zeroes.put(i, LLVMConstInt(arrayLLVMAtomType, 0, 0));
