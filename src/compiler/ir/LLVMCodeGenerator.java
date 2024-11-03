@@ -232,7 +232,7 @@ public class LLVMCodeGenerator implements Visitor {
             if (LLVMGetTypeKind(loadType) == LLVMArrayTypeKind || LLVMGetTypeKind(loadType) == LLVMPointerTypeKind) {
                 IRNodes.store(gep, binary);
             } else {
-                IRNodes.store(LLVMBuildLoad2(builder, loadType, gep, "loaded_element"), binary);
+                IRNodes.store(LLVMBuildLoad2(builder, loadType, gep, name.name + "_load"), binary);
             }
         }
     }
@@ -250,24 +250,30 @@ public class LLVMCodeGenerator implements Visitor {
         var currentBlock = LLVMGetInsertBlock(builder);
         var currentFunction = LLVMGetBasicBlockParent(currentBlock);
 
+        var preBlock = LLVMAppendBasicBlock(currentFunction, "preLoop");
         var loopBlock = LLVMAppendBasicBlock(currentFunction, "loop");
         var afterBlock = LLVMAppendBasicBlock(currentFunction, "afterLoop");
 
         var counterAddress = symbolTable.definitionFor(forLoop.counter.name).get().getValueRef().get();
         LLVMBuildStore(builder, IRNodes.valueFor(forLoop.low).get(), counterAddress);
-        LLVMBuildBr(builder, loopBlock);
-        LLVMPositionBuilderAtEnd(builder, loopBlock);
+
+        LLVMBuildBr(builder, preBlock);
+        LLVMPositionBuilderAtEnd(builder, preBlock);
 
         var counterValue = LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), counterAddress,
                 forLoop.counter.name + " value");
+        forLoop.high.accept(this);
+        var initialCondition = LLVMBuildICmp(builder, LLVMIntULT, counterValue, IRNodes.valueFor(forLoop.high).get(),
+                "initialCounter < high");
+        LLVMBuildCondBr(builder, initialCondition, loopBlock, afterBlock);
 
+        LLVMPositionBuilderAtEnd(builder, loopBlock);
         forLoop.body.accept(this);
 
         forLoop.step.accept(this);
+        counterValue = LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), counterAddress, forLoop.counter.name + " value");
         var nextCounterValue = LLVMBuildAdd(builder, counterValue, IRNodes.valueFor(forLoop.step).get(), "nextValue");
         LLVMBuildStore(builder, nextCounterValue, counterAddress);
-
-        forLoop.high.accept(this);
 
         var condition = LLVMBuildICmp(builder, LLVMIntULT, nextCounterValue, IRNodes.valueFor(forLoop.high).get(),
                 "counter < high");
@@ -635,10 +641,7 @@ public class LLVMCodeGenerator implements Visitor {
     }
 
     private LLVMValueRef getGlobalInitializer(Type type) {
-        if (type.isInt() || type.isLog())
-            return LLVMConstInt(type.convertToLLVMType(context), 0, 0);
-        else
-            return LLVMConstNull(type.convertToLLVMType(context));
+        return LLVMConstNull(type.convertToLLVMType(context));
     }
 
 }
