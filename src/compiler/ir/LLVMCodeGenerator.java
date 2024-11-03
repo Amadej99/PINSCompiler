@@ -250,15 +250,11 @@ public class LLVMCodeGenerator implements Visitor {
         var currentBlock = LLVMGetInsertBlock(builder);
         var currentFunction = LLVMGetBasicBlockParent(currentBlock);
 
-        var preBlock = LLVMAppendBasicBlock(currentFunction, "preLoop");
         var loopBlock = LLVMAppendBasicBlock(currentFunction, "loop");
         var afterBlock = LLVMAppendBasicBlock(currentFunction, "afterLoop");
 
         var counterAddress = symbolTable.definitionFor(forLoop.counter.name).get().getValueRef().get();
         LLVMBuildStore(builder, IRNodes.valueFor(forLoop.low).get(), counterAddress);
-
-        LLVMBuildBr(builder, preBlock);
-        LLVMPositionBuilderAtEnd(builder, preBlock);
 
         var counterValue = LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), counterAddress,
                 forLoop.counter.name + " value");
