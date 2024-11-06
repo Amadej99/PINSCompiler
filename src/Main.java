@@ -148,33 +148,26 @@ public class Main {
              return;
          }
 
-         if (cli.dumpPhases.contains(Phase.IMC)) {
-             LLVMDumpModule(module);
-         }
-
-         if(cli.execPhase.equals(Phase.IMC))
-             return;
-
-         /**
-          * Izvedi kodo z LLVM tolmačem.
-          */
-         LLVMExecutionEngineRef engine = new LLVMExecutionEngineRef();
-         if (LLVMCreateInterpreterForModule(engine, module, error) != 0) {
-             System.err.println("Failed to create LLVM interpreter: " + error.getString());
-             LLVMDisposeMessage(error);
-             return;
-         }
-
-         if (cli.dumpPhases.contains(Phase.INT)) {
-             var mainArgument = LLVMCreateGenericValueOfInt(LLVMInt32TypeInContext(context), 1, 0);
-             LLVMRunFunction(engine, LLVMGetNamedFunction(module, "main"), 1, mainArgument);
-         }
-
-         if(cli.execPhase.equals(Phase.INT))
-             return;
+//         /**
+//          * Izvedi kodo z LLVM tolmačem.
+//          */
+//         LLVMExecutionEngineRef engine = new LLVMExecutionEngineRef();
+//         if (LLVMCreateInterpreterForModule(engine, module, error) != 0) {
+//             System.err.println("Failed to create LLVM interpreter: " + error.getString());
+//             LLVMDisposeMessage(error);
+//             return;
+//         }
+//
+//         if (cli.dumpPhases.contains(Phase.INT)) {
+//             var mainArgument = LLVMCreateGenericValueOfInt(LLVMInt32TypeInContext(context), 1, 0);
+//             LLVMRunFunction(engine, LLVMGetNamedFunction(module, "main"), 1, mainArgument);
+//         }
+//
+//         if(cli.execPhase.equals(Phase.INT))
+//             return;
 
          /**
-          * Zapiši object file.
+          * Inicializiraj ciljno platformo.
           */
          LLVMInitializeAllTargetInfos();
          LLVMInitializeAllTargets();
@@ -193,17 +186,43 @@ public class Main {
 
          var targetMachine = LLVMCreateTargetMachine(target, targetTriple, LLVMGetHostCPUName(),
                  LLVMGetHostCPUFeatures(),
-                 LLVMCodeGenLevelNone, 0, LLVMCodeModelDefault);
-         LLVMCreateTargetDataLayout(targetMachine);
+                 LLVMCodeGenLevelDefault, 2, LLVMCodeModelDefault);
+         LLVMSetModuleDataLayout(module, LLVMCreateTargetDataLayout(targetMachine));
          LLVMSetTarget(module, targetTriple);
 
-         if (LLVMTargetMachineEmitToFile(targetMachine, module, "object.o", 1, error) != 0) {
+        if (cli.dumpPhases.contains(Phase.IMC)) {
+            LLVMDumpModule(module);
+        }
+
+        if(cli.execPhase.equals(Phase.IMC))
+            return;
+
+        /**
+         * Zapiši .asm datoteko.
+         */
+        if (LLVMTargetMachineEmitToFile(targetMachine, module, "object.asm", 0, error) != 0) {
+            System.err.println("Failed to emit .asm file!");
+            LLVMDisposeMessage(error);
+            return;
+        }
+
+         if(cli.dumpPhases.contains(Phase.ASM)){
+             System.out.println("Successfully written .asm file!");
+         }
+
+         if(cli.execPhase.equals(Phase.ASM))
+             return;
+
+        /**
+         * Zapiši .o datoteko.
+         */
+        if (LLVMTargetMachineEmitToFile(targetMachine, module, "object.o", 1, error) != 0) {
              System.err.println("Failed to emit object file!");
              LLVMDisposeMessage(error);
              return;
          }
 
-         System.out.println("Succesfully written object.o");
+        System.out.println("Successfully written object.o");
 
          if (cli.dumpPhases.contains(Phase.OBJ)) {
              System.out.println("Target triple: " + LLVMGetDefaultTargetTriple().getString());
