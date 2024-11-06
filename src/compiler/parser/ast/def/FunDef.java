@@ -117,7 +117,7 @@ public class FunDef extends Def {
             return Optional.empty();
 
         var variables = collectVariableTypes(context);
-        var closureStruct = LLVMStructCreateNamed(context, "closure_" + this.name);
+        var closureStruct = LLVMStructCreateNamed(context, "closure_" + this.generateName());
         LLVMStructSetBody(closureStruct, new PointerPointer<>(variables.toArray(new Pointer[0])), variables.size(), 0);
         this.closureType = Optional.of(closureStruct);
         return this.closureType;
@@ -165,6 +165,11 @@ public class FunDef extends Def {
 
         return variables;
     }
+
+    public String generateName() {
+        return this.parentFunction.map(funDef -> funDef.generateName() + "_" + this.name).orElse(this.name);
+    }
+
 
     public static class Parameters extends Defs {
         public Parameters(Position position, List<Def> parameters){

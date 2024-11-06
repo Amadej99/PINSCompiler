@@ -1,0 +1,14 @@
+declare printf(_ : string, ...) : integer;
+
+fun main() : integer = (
+    printf('%d\n', add(5, 12)),
+    b()
+){ where fun add ( a : integer, b : integer ) : integer = ( a + b )};
+
+fun b() : integer = (
+    { x = 1 },
+    printf('%d\n', add(5, 12))
+) { where var x : integer;
+    fun add ( a : integer, b : integer ) : integer = ( a + b + x + c())
+    { where fun c() : integer = (1) }
+}

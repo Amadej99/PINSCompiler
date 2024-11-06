@@ -44,7 +44,6 @@ import static compiler.seman.type.type.Type.resolveInnerLLVMArrayType;
 import static compiler.seman.type.type.Type.resolveLLVMArrayType;
 
 import java.util.*;
-import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class LLVMCodeGenerator implements Visitor {
@@ -100,9 +99,9 @@ public class LLVMCodeGenerator implements Visitor {
      */
     @Override
     public void visit(Call call) {
-        var calledFunction = LLVMGetNamedFunction(module, call.name);
         var triple = symbolTable.definitionFor(call.name);
         var calledFunDef = triple.get().getDef().asFunDef().get();
+        var calledFunction = triple.get().getValueRef().get();
 
         call.arguments.ifPresent(arguments -> arguments.forEach(argument -> argument.accept(this)));
 
@@ -114,7 +113,7 @@ public class LLVMCodeGenerator implements Visitor {
                     argumentsList.add(symbolTable.definitionFor(name.name).get().getValueRef().get());
                 } else {
                     var value = IRNodes.valueFor(argument).get();
-                    // C standard pravi, da se ob klicu funkcije, ki ima variabilno stevilo parametrov,
+                    // C standard pravi, da se ob klicu funkcije, ki ima variabilno stevilo parametrov
                     // vsi argumenti manjsi od int pretvorijo v int.
                     if(calledFunDef.isVarArg && LLVMGetTypeKind(LLVMTypeOf(value)) == LLVMIntegerTypeKind)
                         argumentsList.add(LLVMBuildZExt(builder, value, LLVMInt32TypeInContext(context), "zext"));
@@ -455,18 +454,16 @@ public class LLVMCodeGenerator implements Visitor {
                 funDef.isVarArg ? 1 : 0);
 
         funDef.LLVMType = functionType;
-        var function = LLVMAddFunction(module, funDef.name, functionType);
+        var function = LLVMAddFunction(module, funDef.generateName(), functionType);
         funDef.addToSymbolTable(symbolTable, Optional.of(function));
     }
 
     @Override
     public void visit(FunDef funDef) {
-        var function = LLVMGetNamedFunction(module, funDef.name);
-
-        if (function == null) {
+        if(symbolTable.definitionFor(funDef.name).isEmpty())
             declareFunction(funDef);
-            function = LLVMGetNamedFunction(module, funDef.name);
-        }
+
+        var function = symbolTable.definitionFor(funDef.name).get().getValueRef().get();
 
         var closureStruct = funDef.generateClosureStruct(context);
         var oldBuildingBlock = LLVMGetInsertBlock(builder);
@@ -500,13 +497,13 @@ public class LLVMCodeGenerator implements Visitor {
             var capturedVars = new ArrayList<String>();
 
             closureStruct.ifPresent(struct -> {
-                var closureInstance = LLVMBuildAlloca(builder, struct, funDef.name + "_closure");
+                var closureInstance = LLVMBuildAlloca(builder, struct, funDef.generateName() + "_closure");
                 funDef.closureInstance = Optional.of(closureInstance);
                 var capturedVariables = funDef.collectVariableValues(symbolTable);
                 var variableNames = capturedVariables.keySet().stream().toList();
 
                 IntStream.range(0, capturedVariables.size()).forEach(i -> {
-                    LLVMValueRef ptr = LLVMBuildStructGEP2(builder, struct, closureInstance, i, funDef.name + " closure_field_" + i);
+                    LLVMValueRef ptr = LLVMBuildStructGEP2(builder, struct, closureInstance, i, funDef.generateName() + "_closure_field_" + i);
                     LLVMBuildStore(builder, capturedVariables.get(variableNames.get(i)), ptr);
                     capturedVars.add(i, variableNames.get(i));
                 });
