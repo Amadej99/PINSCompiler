@@ -154,7 +154,8 @@ public class Main {
         if (mainCodeChunk.isPresent()) {
             Optional<PrintStream> outputStream = cli.dumpPhases.contains(Phase.INT) ? Optional.of(System.out) : Optional.empty();
             var interpreter = new Interpreter(memory, outputStream);
-            interpreter.interpret(mainCodeChunk.get());
+            TimeFunction.timeFunction(() -> interpreter.interpret(mainCodeChunk.get()));
+            // interpreter.interpret(mainCodeChunk.get());
         }
     }
 }
