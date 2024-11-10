@@ -308,14 +308,12 @@ public class LLVMCodeGenerator implements Visitor {
         LLVMPositionBuilderAtEnd(builder, thenBlock);
         ifThenElse.thenExpression.accept(this);
         LLVMBuildBr(builder, exitBlock);
-        thenBlock = LLVMGetInsertBlock(builder);
 
         if (ifThenElse.elseExpression.isPresent()) {
             LLVMAppendExistingBasicBlock(currentFunction, elseBlock);
             LLVMPositionBuilderAtEnd(builder, elseBlock);
             ifThenElse.elseExpression.ifPresent(expr -> expr.accept(this));
             LLVMBuildBr(builder, exitBlock);
-            elseBlock = LLVMGetInsertBlock(builder);
         }
 
         LLVMAppendExistingBasicBlock(currentFunction, exitBlock);
