@@ -1,0 +1,21 @@
+n = 13
+
+PINS:
+73712
+Real time (wall clock): 263.232 seconds
+CPU time: 260.969 seconds
+
+PINS_LLVM:
+73712
+
+real    0m1.163s
+user    0m1.153s
+sys     0m0.000s
+
+C:
+73712
+
+real    0m0.344s
+user    0m0.339s
+sys     0m0.000s
+

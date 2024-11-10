@@ -1,0 +1,34 @@
+fun main(_ : integer) : integer =
+(
+    print_int(queens(0, 13, board)),
+    0
+) { where var board : arr [13] integer };
+
+fun queens(q : integer, num_queens : integer, board : arr[13] integer) : integer =
+(
+    {
+        if q == num_queens then (
+            { count = 1 }
+        )
+        else (
+            { count = 0 },
+            {
+                for r = 0, num_queens, 1 : (
+                    { conflict = false },
+                    {
+                        for c = 0, q, 1 : (
+                            { conflict = conflict | r == board[c] | board[c] - r == q - c | board[c] - r == c - q }
+                        )
+                    },
+                    {
+                        if !conflict then (
+                            { board[q] = r },
+                            { count = count + queens(q + 1, num_queens, board) }
+                        )
+                    }
+                )
+            }
+        )
+    },
+    count
+) { where var count : integer; var r : integer; var c : integer; var conflict : logical }

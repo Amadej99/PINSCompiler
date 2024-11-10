@@ -1,0 +1,52 @@
+var x : arr [20] integer;
+
+fun main( _ : integer ) : integer = (
+    { for iterations = 0, 1000000, 1 : (
+        { x[0] = 60},
+        { x[1] = 14},
+        { x[2] = 94},
+        { x[3] = 8},
+        { x[4] = 23},
+        { x[5] = 55},
+        { x[6] = 29},
+        { x[7] = 73},
+        { x[8] = 97},
+        { x[9] = 64},
+        { x[10] = 78},
+        { x[11] = 69},
+        { x[12] = 57},
+        { x[13] = 74},
+        { x[14] = 68},
+        { x[15] = 4},
+        { x[16] = 7},
+        { x[17] = 67},
+        { x[18] = 87},
+        { x[19] = 60},
+        bubble(x, 20)
+    )},
+    print_arr(x)
+) { where var i : integer; var iterations : integer };
+
+fun bubble(t : arr[20] integer, size : integer) : integer =
+(
+    { for i = 0, size - 1, 1 : (
+        { for j = 0, size - i - 1 , 1 : (
+            { if t[j] > t[j + 1] then swap(t, j, j + 1) }
+        )}
+    )},
+    0
+) { where var i : integer; var j : integer };
+
+fun swap(t : arr[20] integer, a : integer, b : integer) : integer =
+(
+    { temp = t[a] },
+    { t[a] = t[b] },
+    { t[b] = temp }
+) { where var temp : integer };
+
+fun print_arr( x : arr [20] integer ) : integer = (
+    print_str('[ '),
+    { for i = 0, 20, 1 : ( print_int(x[i]), print_str(' '))},
+    print_str('] '),
+    0
+) { where var i : integer }

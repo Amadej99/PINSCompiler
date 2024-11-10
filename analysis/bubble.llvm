@@ -1,0 +1,41 @@
+declare printf(_ : string, ...) : integer;
+declare srand( x : integer) : integer;
+declare rand() : integer;
+
+var static : arr[20] integer;
+var x : arr [20] integer;
+
+fun main() : integer = (
+    srand(12),
+    { for i = 0, 20, 1 : { static[i] = rand() % 100 } },
+    print_arr(static),
+    { for iterations = 0, 100000, 1 : (
+        { x = static },
+        bubble(x, 20)
+    )},
+    print_arr(x)
+) { where var i : integer; var iterations : integer };
+
+fun bubble(t : arr[20] integer, size : integer ) : integer =
+(
+    { for i = 0, size - 1, 1 : (
+        { for j = 0, size - i - 1, 1 : (
+            { if t[j] > t[j + 1] then swap(t, j, j + 1) }
+        )}
+    )},
+    0
+) { where var i : integer; var j : integer };
+
+fun swap(t : arr[20] integer, a : integer, b : integer) : integer =
+(
+    { temp = t[a] },
+    { t[a] = t[b] },
+    { t[b] = temp }
+) { where var temp : integer };
+
+fun print_arr( x : arr [20] integer ) : integer = (
+    printf('[ '),
+    { for i = 0, 20, 1 : printf('%d ', x[i])},
+    printf(']\n'),
+    0
+) { where var i : integer }
