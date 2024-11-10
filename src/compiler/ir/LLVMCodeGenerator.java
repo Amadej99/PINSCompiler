@@ -2,11 +2,7 @@ package compiler.ir;
 
 import compiler.seman.name.env.FastSymbolTable;
 import compiler.seman.name.env.SymbolTable;
-import org.bytedeco.llvm.LLVM.LLVMBuilderRef;
-import org.bytedeco.llvm.LLVM.LLVMContextRef;
-import org.bytedeco.llvm.LLVM.LLVMModuleRef;
-import org.bytedeco.llvm.LLVM.LLVMTypeRef;
-import org.bytedeco.llvm.LLVM.LLVMValueRef;
+import org.bytedeco.llvm.LLVM.*;
 
 import common.Report;
 
@@ -324,23 +320,6 @@ public class LLVMCodeGenerator implements Visitor {
 
         LLVMAppendExistingBasicBlock(currentFunction, exitBlock);
         LLVMPositionBuilderAtEnd(builder, exitBlock);
-
-//      TODO: You must not allow two different types of expressions in an if else statement.
-        if (ifThenElse.elseExpression.isPresent()) {
-            var phi = LLVMBuildPhi(builder, LLVMTypeOf(IRNodes.valueFor(ifThenElse.thenExpression).get()), "phi");
-            var phiValues = new PointerPointer<>(2);
-            phiValues.put(0, IRNodes.valueFor(ifThenElse.thenExpression).get());
-            phiValues.put(1, IRNodes.valueFor(ifThenElse.elseExpression.get()).get());
-
-            var phiBlocks = new PointerPointer<>(2);
-            phiBlocks.put(0, thenBlock);
-            phiBlocks.put(1, elseBlock);
-
-            LLVMAddIncoming(phi, phiValues, phiBlocks, 2);
-
-            phiBlocks.deallocate();
-            phiValues.deallocate();
-        }
 
         IRNodes.store(LLVMConstInt(LLVMInt32TypeInContext(context), 0, 0), ifThenElse);
     }
