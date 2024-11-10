@@ -1,0 +1,15 @@
+declare printf(_ : string, ...) : integer;
+
+fun main( a : integer ) : integer = (
+    { a = 5 },
+    { b = true },
+    printf('%d, %d\n', a, b),
+    notranja('tukaj'),
+    0
+) { where var b : logical;
+    fun notranja ( c : string ) : integer = (
+        printf('%d, %d, %s\n', a, b, c)
+    ) { where fun globoka () : integer = (
+        printf('%d\n',a)
+    )}
+}
