@@ -9,7 +9,7 @@ fun main() : integer = (
     srand(12),
     { for i = 0, 20, 1 : { static[i] = rand() % 100 } },
     print_arr(static),
-    { for iterations = 0, 100000, 1 : (
+    { for iterations = 0, 1000000, 1 : (
         { x = static },
         bubble(x, 20)
     )},
