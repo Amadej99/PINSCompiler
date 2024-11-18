@@ -5,8 +5,7 @@ declare rand() : integer;
 var static : arr[20] integer;
 var x : arr [20] integer;
 
-fun main() : integer =
-(
+fun main() : integer = (
     srand(12),
     { for i = 0, 20, 1 : { static[i] = rand() % 100 } },
     print_arr(static),
@@ -23,9 +22,9 @@ fun partition( x : arr[20] integer, low : integer, high : integer ) : integer = 
     { j = high },
 
     { while i < j : (
-        {while x[i] <= p & i <= high - 1 : { i = i + 1}},
-        {while x[j] > p & j >= low + 1 : { j = j - 1}},
-        {if i < j then swap(x, i, j)}
+        { while x[i] <= p & i <= high - 1 : { i = i + 1}},
+        { while x[j] > p & j >= low + 1 : { j = j - 1}},
+        { if i < j then swap(x, i, j)}
     )},
     swap(x, low, j),
     j

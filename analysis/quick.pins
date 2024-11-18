@@ -22,42 +22,39 @@ fun main( _ : integer ) : integer = (
         { x[17] = 67},
         { x[18] = 87},
         { x[19] = 60},
-        quick(x, 0, 19)
+        quickSort(x, 0, 19)
     )},
     print_arr(x)
 ) { where var i : integer; var iterations : integer };
 
-fun quick(t : arr [20] integer, left : integer, right : integer) : integer =
-(
-    { if left < right then (
-        { r = partition(t, left, right) },
-        quick(t, left, r-1),
-        quick(t, r + 1, right)
-    )},
-    0
-) { where var r : integer };
+fun partition( x : arr[20] integer, low : integer, high : integer ) : integer = (
+    { p = x[low] },
+    { i = low },
+    { j = high },
 
-fun partition(t : arr[20] integer, left : integer, right : integer) : integer = (
-    {l = left},
-    {r = right + 1},
-    {c = true},
-    { while c : (
-        { l = l + 1 },
-        { while t[l] < t[left] & l < right : { l = l + 1 } },
-        { r = r - 1 },
-        { while t[r] > t[left] : { r = r - 1 } },
-        { c = l < r },
-        { if c then swap(t, l, r) }
+    { while i < j : (
+        {while x[i] <= p & i <= high - 1 : { i = i + 1}},
+        {while x[j] > p & j >= low + 1 : { j = j - 1}},
+        {if i < j then swap(x, i, j)}
     )},
-    swap(t, left, r),
-    r
-) { where var l : integer; var r : integer; var c : logical };
+    swap(x, low, j),
+    j
+) { where var p : integer; var i : integer; var j : integer };
 
-fun swap(t : arr[20] integer, a : integer, b : integer) : integer =
-(
-    { temp = t[a] },
-    { t[a] = t[b] },
-    { t[b] = temp }
+fun quickSort( x : arr[20] integer, low : integer, high : integer) : integer = (
+    { if low < high then (
+        { pi = partition(x, low, high) },
+        quickSort(x, low, pi - 1),
+        quickSort(x, pi + 1, high)
+    )},
+    1
+) { where var pi : integer };
+
+fun swap ( x : arr[20] integer, i : integer, j : integer ) : integer = (
+    { temp = x[i] },
+    { x[i] = x[j] },
+    { x[j] = temp },
+    1
 ) { where var temp : integer };
 
 fun print_arr( x : arr [20] integer ) : integer = (

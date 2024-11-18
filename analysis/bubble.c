@@ -40,7 +40,6 @@ int main() {
     printArray(fixed, SIZE);
     for (int i = 0; i < 1000000; i++){
         memcpy(x, fixed, sizeof(fixed));
-//        printArray(x, SIZE);
         bubbleSort(x, SIZE);
     }
     printArray(x, SIZE);

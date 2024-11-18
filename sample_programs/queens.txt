@@ -2,11 +2,11 @@ declare printf(_ : string, ...) : integer;
 
 fun main() : integer =
 (
-    printf('%d\n', queens(0, 8, board)),
+    printf('%d\n', queens(0, 14, board)),
     0
-) { where var board : arr [8] integer };
+) { where var board : arr [14] integer };
 
-fun queens(q : integer, num_queens : integer, board : arr[8] integer) : integer =
+fun queens(q : integer, num_queens : integer, board : arr[14] integer) : integer =
 (
     {
         if q == num_queens then (
@@ -15,7 +15,7 @@ fun queens(q : integer, num_queens : integer, board : arr[8] integer) : integer 
         else (
             { count = 0 },
             {
-                for r = 0, 8, 1 : (
+                for r = 0, num_queens, 1 : (
                     { conflict = false },
                     {
                         for c = 0, q, 1 : (
