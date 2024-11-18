@@ -1,0 +1,55 @@
+declare printf(_ : string, ...) : integer;
+declare srand( x : integer) : integer;
+declare rand() : integer;
+
+var static : arr[20] integer;
+var x : arr [20] integer;
+
+fun main() : integer =
+(
+    srand(12),
+    { for i = 0, 20, 1 : { static[i] = rand() % 100 } },
+    print_arr(static),
+    { for iterations = 0, 1000000, 1 : (
+        { x = static },
+        quickSort(x, 0, 19)
+    )},
+    print_arr(x)
+) { where var i : integer; var iterations : integer };
+
+fun partition( x : arr[20] integer, low : integer, high : integer ) : integer = (
+    { p = x[low] },
+    { i = low },
+    { j = high },
+
+    { while i < j : (
+        {while x[i] <= p & i <= high - 1 : { i = i + 1}},
+        {while x[j] > p & j >= low + 1 : { j = j - 1}},
+        {if i < j then swap(x, i, j)}
+    )},
+    swap(x, low, j),
+    j
+) { where var p : integer; var i : integer; var j : integer };
+
+fun quickSort( x : arr[20] integer, low : integer, high : integer) : integer = (
+    { if low < high then (
+        { pi = partition(x, low, high) },
+        quickSort(x, low, pi - 1),
+        quickSort(x, pi + 1, high)
+    )},
+    1
+) { where var pi : integer };
+
+fun swap ( x : arr[20] integer, i : integer, j : integer ) : integer = (
+    { temp = x[i] },
+    { x[i] = x[j] },
+    { x[j] = temp },
+    1
+) { where var temp : integer };
+
+fun print_arr( x : arr [20] integer ) : integer = (
+    printf('[ '),
+    { for i = 0, 20, 1 : printf('%d ', x[i])},
+    printf(']\n'),
+    0
+) { where var i : integer }

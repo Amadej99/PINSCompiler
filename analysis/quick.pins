@@ -1,0 +1,68 @@
+var x : arr [20] integer;
+
+fun main( _ : integer ) : integer = (
+    { for iterations = 0, 1000000, 1 : (
+        { x[0] = 60},
+        { x[1] = 14},
+        { x[2] = 94},
+        { x[3] = 8},
+        { x[4] = 23},
+        { x[5] = 55},
+        { x[6] = 29},
+        { x[7] = 73},
+        { x[8] = 97},
+        { x[9] = 64},
+        { x[10] = 78},
+        { x[11] = 69},
+        { x[12] = 57},
+        { x[13] = 74},
+        { x[14] = 68},
+        { x[15] = 4},
+        { x[16] = 7},
+        { x[17] = 67},
+        { x[18] = 87},
+        { x[19] = 60},
+        quick(x, 0, 19)
+    )},
+    print_arr(x)
+) { where var i : integer; var iterations : integer };
+
+fun quick(t : arr [20] integer, left : integer, right : integer) : integer =
+(
+    { if left < right then (
+        { r = partition(t, left, right) },
+        quick(t, left, r-1),
+        quick(t, r + 1, right)
+    )},
+    0
+) { where var r : integer };
+
+fun partition(t : arr[20] integer, left : integer, right : integer) : integer = (
+    {l = left},
+    {r = right + 1},
+    {c = true},
+    { while c : (
+        { l = l + 1 },
+        { while t[l] < t[left] & l < right : { l = l + 1 } },
+        { r = r - 1 },
+        { while t[r] > t[left] : { r = r - 1 } },
+        { c = l < r },
+        { if c then swap(t, l, r) }
+    )},
+    swap(t, left, r),
+    r
+) { where var l : integer; var r : integer; var c : logical };
+
+fun swap(t : arr[20] integer, a : integer, b : integer) : integer =
+(
+    { temp = t[a] },
+    { t[a] = t[b] },
+    { t[b] = temp }
+) { where var temp : integer };
+
+fun print_arr( x : arr [20] integer ) : integer = (
+    print_str('[ '),
+    { for i = 0, 20, 1 : ( print_int(x[i]), print_str(' '))},
+    print_str('] '),
+    0
+) { where var i : integer }
