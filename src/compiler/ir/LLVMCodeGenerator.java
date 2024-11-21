@@ -119,8 +119,13 @@ public class LLVMCodeGenerator implements Visitor {
             });
         });
 
-        calledFunDef.parentFunction.ifPresent(parentFunDef -> {
-            argumentsList.add(parentFunDef.closureInstance.get());
+        var currentBlock = LLVMGetInsertBlock(builder);
+        var currentFunction = LLVMGetBasicBlockParent(currentBlock);
+        var currentFunDef = symbolTable.definitionFor(currentFunction).get().getDef().asFunDef().get();
+
+        calledFunDef.parentFunction.ifPresent(parentFunDef ->{
+            var neededClosure = currentFunDef.getNestedClosure(context, builder, symbolTable, parentFunDef);
+            argumentsList.add(neededClosure);
         });
 
         IRNodes.store(LLVMBuildCall2(builder, calledFunDef.LLVMType, calledFunction, new PointerPointer(argumentsList.toArray(new Pointer[0])),
@@ -262,7 +267,7 @@ public class LLVMCodeGenerator implements Visitor {
         forLoop.body.accept(this);
 
         forLoop.step.accept(this);
-        counterValue = LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), counterAddress, forLoop.counter.name + " value");
+        counterValue = LLVMBuildLoad2(builder, LLVMInt32TypeInContext(context), counterAddress, forLoop.counter.name + "_value");
         var nextCounterValue = LLVMBuildAdd(builder, counterValue, IRNodes.valueFor(forLoop.step).get(), "nextValue");
         LLVMBuildStore(builder, nextCounterValue, counterAddress);
 
@@ -382,6 +387,7 @@ public class LLVMCodeGenerator implements Visitor {
 
     @Override
     public void visit(Where where) {
+        where.defs.definitions.stream().filter(def -> def instanceof FunDef).toList().forEach(def -> declareFunction(def.asFunDef().get()));
         where.defs.definitions.stream().filter(def -> !(def instanceof VarDef)).toList().forEach(def -> def.accept(this));
         where.expr.accept(this);
         var whereReturn = IRNodes.valueFor(where.expr).get();

@@ -48,7 +48,7 @@ public class Name extends Expr {
         currentFunDef = currentFunDef.parentFunction.get();
 
         while(diff > 1){
-            closureInstance = LLVMBuildStructGEP2(builder, currentFunDef.closureType.get(), closureInstance, currentFunDef.closureSize.get() - 1, currentFunDef.name + "_closure");
+            closureInstance = LLVMBuildStructGEP2(builder, currentFunDef.closureType.get(), closureInstance, currentFunDef.closureSize.get() - 1, currentFunDef.name + "_parent_closure");
             currentFunDef = currentFunDef.parentFunction.get();
             closureInstance = LLVMBuildLoad2(builder, LLVMPointerTypeInContext(context, 0), closureInstance, currentFunDef.name + "_closure");
             diff--;
@@ -57,7 +57,7 @@ public class Name extends Expr {
         var varsList = currentFunDef.capturedVariables;
         var index = varsList.indexOf(this.name);
         if(index != -1) {
-            var fieldPtr = LLVMBuildStructGEP2(builder, currentFunDef.closureType.get(), closureInstance, index, currentFunDef.name + " closure_field_" + index);
+            var fieldPtr = LLVMBuildStructGEP2(builder, currentFunDef.closureType.get(), closureInstance, index, currentFunDef.name + "_closure_field_" + index);
             return LLVMBuildLoad2(builder, LLVMPointerType(LLVMInt32Type(), 0), fieldPtr, this.name + "_ptr");
         }
 

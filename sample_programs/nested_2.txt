@@ -1,0 +1,69 @@
+declare printf(_ : string, ...) : integer;
+
+fun main(_ : integer) : integer =
+(
+    { v0 = 0 },
+    printf('main\n'),
+    f1(10),
+    0
+) { where
+    fun f1(p1 : integer) : integer = (
+        { v1 = 1 },
+        printf('f1\n'),
+        printf('%d\n', v1),
+        printf('%d\n', p1),
+        f2(20),
+        0
+    ) { where
+        fun f2(p2 : integer) : integer = (
+            { v2 = 2 },
+            printf('f2\n'),
+            printf('%d\n', v2),
+            printf('%d\n', v1),
+            printf('%d\n', p2),
+            printf('%d\n', p1),
+            f3(30),
+            0
+        ) { where
+            fun f3(p3 : integer) : integer = (
+                { v3 = 3 },
+                printf('f3\n'),
+                printf('%d\n', v3),
+                printf('%d\n', v2),
+                printf('%d\n', v1),
+                printf('%d\n', p3),
+                printf('%d\n', p2),
+                printf('%d\n', p1),
+                f10(100),
+                f20(200),
+                0
+            ) { where
+                var v3 : integer
+            };
+            var v2 : integer
+        };
+        var v1 : integer;
+        fun f20(p20 : integer) : integer = (
+            printf('f20\n'),
+            printf('%d\n', v1),
+            printf('%d\n', p20),
+            printf('%d\n', p1),
+            f21(21),
+            0
+        );
+        fun f21(p21 : integer) : integer = (
+            printf('f21\n'),
+            printf('%d\n', v1),
+            printf('%d\n', p21),
+            printf('%d\n', p1),
+            0
+        )
+    };
+    var v0 : integer;
+    fun f10(p10 : integer) : integer = (
+        printf('f10\n'),
+        printf('%d\n', p10),
+        printf('%d\n', v0),
+        0
+    )
+}

@@ -18,6 +18,7 @@ import compiler.parser.ast.expr.Where;
 import compiler.seman.name.env.SymbolTable;
 import org.bytedeco.javacpp.Pointer;
 import org.bytedeco.javacpp.PointerPointer;
+import org.bytedeco.llvm.LLVM.LLVMBuilderRef;
 import org.bytedeco.llvm.LLVM.LLVMContextRef;
 import org.bytedeco.llvm.LLVM.LLVMTypeRef;
 import org.bytedeco.llvm.LLVM.LLVMValueRef;
@@ -168,6 +169,39 @@ public class FunDef extends Def {
 
     public String generateName() {
         return this.parentFunction.map(funDef -> funDef.generateName() + "_" + this.name).orElse(this.name);
+    }
+
+    /**
+     * Najde strukturo neposredno nadrejeno klicani funkciji.
+     * @param context
+     * @param builder
+     * @param symbolTable
+     * @param target
+     * @return
+     */
+    public LLVMValueRef getNestedClosure(LLVMContextRef context, LLVMBuilderRef builder, SymbolTable symbolTable, FunDef target){
+        var currentScope = symbolTable.getCurrentScope();
+        var neededScope = symbolTable.definitionFor(target.name).get().getScope();
+
+        var diff = Math.abs(currentScope - neededScope - 1);
+
+        if(diff == 0){
+            return this.closureInstance.get();
+        }
+
+        var currentFunction = symbolTable.definitionFor(this.name).get().getValueRef().get();
+        var closureInstance = LLVMGetLastParam(currentFunction);
+
+        var currentFunDef = this.parentFunction.get();
+
+        while(diff > 1){
+            closureInstance = LLVMBuildStructGEP2(builder, currentFunDef.closureType.get(), closureInstance, currentFunDef.closureSize.get() - 1, currentFunDef.name + "_parent_closure");
+            currentFunDef = currentFunDef.parentFunction.get();
+            closureInstance = LLVMBuildLoad2(builder, LLVMPointerTypeInContext(context, 0), closureInstance, currentFunDef.name + "_closure");
+            diff--;
+        }
+
+        return closureInstance;
     }
 
 

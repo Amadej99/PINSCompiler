@@ -216,7 +216,7 @@ public abstract class Type {
 
     /**
      * Vrne velikost tipa. Če je tip tabela, vrne velikost tabele.
-     * @return
+     * @return velikost tipa v bajtih.
      */
     public int getSize(){
         if(this.isInt())

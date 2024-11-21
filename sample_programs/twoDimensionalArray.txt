@@ -19,7 +19,7 @@ fun printfArr(x : arr [10] arr[10] integer) : integer = (
 
 fun printSubArr(x : arr [10] integer) : integer = (
     {for i = 0, 10, 1 : (
-        printf('%d\n' x[i])
+        printf('%d\n', x[i])
     )},
     0
-)
+) { where var i : integer }
